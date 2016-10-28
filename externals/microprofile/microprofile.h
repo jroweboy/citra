@@ -197,7 +197,7 @@ inline uint64_t MicroProfileGetCurrentThreadId()
 #define MP_STRCASECMP strcasecmp
 #define MP_GETCURRENTTHREADID() MicroProfileGetCurrentThreadId()
 typedef uint64_t ThreadIdType;
-#elif defined(_WIN32)
+#elif defined(_WIN32) && !defined(__MINGW32__)
 int64_t MicroProfileGetTick();
 #define MP_TICK() MicroProfileGetTick()
 #define MP_BREAK() __debugbreak()
@@ -206,7 +206,7 @@ int64_t MicroProfileGetTick();
 #define MP_GETCURRENTTHREADID() GetCurrentThreadId()
 typedef uint32_t ThreadIdType;
 
-#elif defined(__linux__)
+#elif defined(__linux__) || (defined(__MINGW32__) && defined(__GNUC__))
 #include <unistd.h>
 #include <time.h>
 inline int64_t MicroProfileTicksPerSecondCpu()
@@ -512,7 +512,7 @@ typedef int MpSocket;
 
 #if defined(__APPLE__) || defined(__linux__)
 typedef pthread_t MicroProfileThread;
-#elif defined(_WIN32)
+#elif defined(_WIN32) && !defined(__MINGW32__)
 typedef HANDLE MicroProfileThread;
 #else
 typedef std::thread* MicroProfileThread;
@@ -878,7 +878,7 @@ inline uint16_t MicroProfileGetGroupIndex(MicroProfileToken t)
 
 #ifdef MICROPROFILE_IMPL
 
-#ifdef _WIN32
+#if  defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
 #define snprintf _snprintf
 
@@ -921,7 +921,7 @@ void MicroProfileThreadJoin(MicroProfileThread* pThread)
     int r = pthread_join(*pThread, 0);
     MP_ASSERT(r == 0);
 }
-#elif defined(_WIN32)
+#elif defined(_WIN32) && !defined(__MINGW32__)
 typedef HANDLE MicroProfileThread;
 DWORD _stdcall ThreadTrampoline(void* pFunc)
 {

@@ -40,6 +40,12 @@ option(CITRA_USE_BUNDLED_SDL2 "Download bundled SDL2 binaries" OFF)
 option(ENABLE_QT "Enable the Qt frontend" ON)
 option(CITRA_USE_BUNDLED_QT "Download bundled Qt binaries" OFF)
 
+IF(WIN32)
+    SET(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+ELSE(WIN32)
+    SET(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+ENDIF(WIN32)
+
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git/hooks/pre-commit)
     message(STATUS "Copying pre-commit hook")
     file(COPY hooks/pre-commit
@@ -105,6 +111,8 @@ else()
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG /INCREMENTAL:NO /OPT:REF,ICF" CACHE STRING "" FORCE)
 endif()
 
+SET(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread")
+
 add_definitions(-DSINGLETHREADED)
 # CMake seems to only define _DEBUG on Windows
 set_property(DIRECTORY APPEND PROPERTY
@@ -168,7 +176,9 @@ IF (APPLE)
 ELSEIF(MINGW)
     # GCC does not support codecvt, so use iconv instead
     # PSAPI is the Process Status API
-    set(PLATFORM_LIBRARIES winmm ws2_32 psapi iconv)
+    set(PLATFORM_LIBRARIES winmm ws2_32 psapi iconv imm32)
+    set(CMAKE_VERBOSE_MAKEFILE "ON")
+    set(SDL2_LIBRARY "${SDL2_LIBRARY};dinput8;dxguid;dxerr8;user32;gdi32;winmm;imm32;ole32;oleaut32;shell32;version;uuid")
 
     # WSAPoll functionality doesn't exist before WinNT 6.x (Vista and up)
     add_definitions(-D_WIN32_WINNT=0x0600)
