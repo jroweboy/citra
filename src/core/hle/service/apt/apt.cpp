@@ -53,7 +53,7 @@ void Initialize(Service::Interface* self) {
     u32 app_id = cmd_buff[1];
     u32 flags  = cmd_buff[2];
 
-    cmd_buff[2] = IPC::MoveHandleDesc(2);
+    cmd_buff[2] = IPC::CopyHandleDesc(2);
     cmd_buff[3] = Kernel::g_handle_table.Create(notification_event).MoveFrom();
     cmd_buff[4] = Kernel::g_handle_table.Create(parameter_event).MoveFrom();
 
@@ -81,13 +81,8 @@ void GetSharedFont(Service::Interface* self) {
 
     // The shared font has to be relocated to the new address before being passed to the application.
     VAddr target_address = Memory::PhysicalToVirtualAddress(shared_font_mem->linear_heap_phys_address);
-    // The shared font dumped by 3dsutils (https://github.com/citra-emu/3dsutils) uses this address as base,
-    // so we relocate it from there to our real address.
-    // TODO(Subv): This address is wrong if the shared font is dumped from a n3DS,
-    // we need a way to automatically calculate the original address of the font from the file.
-    static const VAddr SHARED_FONT_VADDR = 0x18000000;
     if (!shared_font_relocated) {
-        BCFNT::RelocateSharedFont(shared_font_mem, SHARED_FONT_VADDR, target_address);
+        BCFNT::RelocateSharedFont(shared_font_mem, target_address);
         shared_font_relocated = true;
     }
     cmd_buff[0] = IPC::MakeHeader(0x44, 2, 2);
@@ -96,7 +91,7 @@ void GetSharedFont(Service::Interface* self) {
     // the real APT service calculates this address by scanning the entire address space (using svcQueryMemory)
     // and searches for an allocation of the same size as the Shared Font.
     cmd_buff[2] = target_address;
-    cmd_buff[3] = IPC::MoveHandleDesc();
+    cmd_buff[3] = IPC::CopyHandleDesc();
     cmd_buff[4] = Kernel::g_handle_table.Create(shared_font_mem).MoveFrom();
 }
 

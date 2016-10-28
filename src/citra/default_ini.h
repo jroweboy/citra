@@ -34,7 +34,7 @@ pad_circle_right =
 pad_circle_modifier =
 
 # The applied modifier scale to circle pad.
-# Must be in range of 0.0-1.0. Defaults to 0.5
+# Must be in range of 0.0-1.0. Defaults to 0.4
 pad_circle_modifier_scale =
 
 [Core]
@@ -44,16 +44,30 @@ frame_skip =
 
 [Renderer]
 # Whether to use software or hardware rendering.
-# 0 (default): Software, 1: Hardware
+# 0: Software, 1 (default): Hardware
 use_hw_renderer =
 
 # Whether to use the Just-In-Time (JIT) compiler for shader emulation
-# 0 : Interpreter (slow), 1 (default): JIT (fast)
+# 0: Interpreter (slow), 1 (default): JIT (fast)
 use_shader_jit =
 
 # Whether to use native 3DS screen resolution or to scale rendering resolution to the displayed screen size.
 # 0 (default): Native, 1: Scaled
 use_scaled_resolution =
+
+# Whether to enable V-Sync (caps the framerate at 60FPS) or not.
+# 0 (default): Off, 1: On
+use_vsync =
+
+[Layout]
+# Layout for the screen inside the render window.
+# 0 (default): Default Top Bottom Screen, 1: Single Screen Only, 2: Large Screen Small Screen
+layout_option =
+
+# Swaps the prominent screen with the other screen.
+# For example, if Single Screen is chosen, setting this to 1 will display the bottom screen instead of the top screen.
+# 0 (default): Top Screen is prominent, 1: Bottom Screen is prominent
+swap_screen =
 
 # The clear color for the renderer. What shows up on the sides of the bottom screen.
 # Must be in range of 0.0-1.0. Defaults to 1.0 for all.
@@ -65,6 +79,12 @@ bg_green =
 # Which audio output engine to use.
 # auto (default): Auto-select, null: No audio output, sdl2: SDL2 (if available)
 output_engine =
+
+# Whether or not to enable the audio-stretching post-processing effect.
+# This effect adjusts audio speed to match emulation speed and helps prevent audio stutter,
+# at the cost of increasing audio latency.
+# 0: No, 1 (default): Yes
+enable_audio_stretching =
 
 [Data Storage]
 # Whether to create a virtual SD card.

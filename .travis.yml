@@ -7,6 +7,7 @@ matrix:
       dist: trusty
     - os: osx
       sudo: false
+      osx_image: xcode7.3
 
 env:
   global:
@@ -24,6 +25,10 @@ addons:
       - xorg-dev
       - lib32stdc++6 # For CMake
       - lftp # To upload builds
+
+cache:
+  directories:
+    - $HOME/.local
 
 install: ./.travis-deps.sh
 script: ./.travis-build.sh

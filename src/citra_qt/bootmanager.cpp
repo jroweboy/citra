@@ -10,7 +10,6 @@
 
 #include "citra_qt/bootmanager.h"
 
-#include "common/key_map.h"
 #include "common/microprofile.h"
 #include "common/scm_rev.h"
 #include "common/string_util.h"
@@ -18,6 +17,9 @@
 #include "core/core.h"
 #include "core/settings.h"
 #include "core/system.h"
+
+#include "input_core/input_core.h"
+#include "input_core/devices/keyboard.h"
 
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/video_core.h"
@@ -107,13 +109,12 @@ private:
 };
 
 GRenderWindow::GRenderWindow(QWidget* parent, EmuThread* emu_thread) :
-    QWidget(parent), keyboard_id(0), emu_thread(emu_thread) {
+    QWidget(parent), keyboard_id(0), emu_thread(emu_thread), child(nullptr) {
 
     std::string window_title = Common::StringFromFormat("Citra | %s-%s", Common::g_scm_branch, Common::g_scm_desc);
     setWindowTitle(QString::fromStdString(window_title));
 
-    keyboard_id = KeyMap::NewDeviceId();
-    ReloadSetKeymaps();
+    keyboard_id = 0;
 
     // TODO: One of these flags might be interesting: WA_OpaquePaintEvent, WA_NoBackground, WA_DontShowOnScreen, WA_DeleteOnClose
     QGLFormat fmt;
@@ -186,8 +187,7 @@ void GRenderWindow::OnFramebufferSizeChanged()
     qreal pixelRatio = windowPixelRatio();
     unsigned width = child->QPaintDevice::width() * pixelRatio;
     unsigned height = child->QPaintDevice::height() * pixelRatio;
-
-    NotifyFramebufferLayoutChanged(EmuWindow::FramebufferLayout::DefaultScreenLayout(width, height));
+    UpdateCurrentFramebufferLayout(width, height);
 }
 
 void GRenderWindow::BackupGeometry()
@@ -235,12 +235,16 @@ void GRenderWindow::closeEvent(QCloseEvent* event) {
 
 void GRenderWindow::keyPressEvent(QKeyEvent* event)
 {
-    KeyMap::PressKey(*this, { event->key(), keyboard_id });
+    auto keyboard = InputCore::GetKeyboard();
+    KeyboardKey param = KeyboardKey(event->key(), QKeySequence(event->key()).toString().toStdString());
+    keyboard->KeyPressed(param);
 }
 
 void GRenderWindow::keyReleaseEvent(QKeyEvent* event)
 {
-    KeyMap::ReleaseKey(*this, { event->key(), keyboard_id });
+    auto keyboard = InputCore::GetKeyboard();
+    KeyboardKey param = KeyboardKey(event->key(), QKeySequence(event->key()).toString().toStdString());
+    keyboard->KeyReleased(param);
 }
 
 void GRenderWindow::mousePressEvent(QMouseEvent *event)
@@ -268,17 +272,43 @@ void GRenderWindow::mouseReleaseEvent(QMouseEvent *event)
         this->TouchReleased();
 }
 
-void GRenderWindow::ReloadSetKeymaps()
-{
-    KeyMap::ClearKeyMapping(keyboard_id);
-    for (int i = 0; i < Settings::NativeInput::NUM_INPUTS; ++i) {
-        KeyMap::SetKeyMapping({ Settings::values.input_mappings[Settings::NativeInput::All[i]], keyboard_id }, KeyMap::mapping_targets[i]);
-    }
-}
-
 void GRenderWindow::OnClientAreaResized(unsigned width, unsigned height)
 {
     NotifyClientAreaSizeChanged(std::make_pair(width, height));
+}
+
+void GRenderWindow::InitRenderTarget() {
+    if (child) {
+        delete child;
+    }
+
+    if (layout()) {
+        delete layout();
+    }
+
+    // TODO: One of these flags might be interesting: WA_OpaquePaintEvent, WA_NoBackground, WA_DontShowOnScreen, WA_DeleteOnClose
+    QGLFormat fmt;
+    fmt.setVersion(3, 3);
+    fmt.setProfile(QGLFormat::CoreProfile);
+    fmt.setSwapInterval(Settings::values.use_vsync);
+
+    // Requests a forward-compatible context, which is required to get a 3.2+ context on OS X
+    fmt.setOption(QGL::NoDeprecatedFunctions);
+
+    child = new GGLWidgetInternal(fmt, this);
+    QBoxLayout* layout = new QHBoxLayout(this);
+
+    resize(VideoCore::kScreenTopWidth, VideoCore::kScreenTopHeight + VideoCore::kScreenBottomHeight);
+    layout->addWidget(child);
+    layout->setMargin(0);
+    setLayout(layout);
+
+    OnMinimalClientAreaChangeRequest(GetActiveConfig().min_client_area_size);
+
+    OnFramebufferSizeChanged();
+    NotifyClientAreaSizeChanged(std::pair<unsigned, unsigned>(child->width(), child->height()));
+
+    BackupGeometry();
 }
 
 void GRenderWindow::OnMinimalClientAreaChangeRequest(const std::pair<unsigned,unsigned>& minimal_size) {

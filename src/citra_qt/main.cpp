@@ -243,7 +243,9 @@ bool GMainWindow::InitializeSystem() {
     if (emu_thread != nullptr)
         ShutdownGame();
 
+    render_window->InitRenderTarget();
     render_window->MakeCurrent();
+
     if (!gladLoadGL()) {
         QMessageBox::critical(this, tr("Error while starting Citra!"),
                               tr("Failed to initialize the video core!\n\n"
@@ -508,12 +510,10 @@ void GMainWindow::ToggleWindowMode() {
 }
 
 void GMainWindow::OnConfigure() {
-    ConfigureDialog configureDialog(this, emulation_running);
+    ConfigureDialog configureDialog(this);
     auto result = configureDialog.exec();
-    if (result == QDialog::Accepted)
-    {
+    if (result == QDialog::Accepted) {
         configureDialog.applyConfiguration();
-        render_window->ReloadSetKeymaps();
         config->Save();
     }
 }

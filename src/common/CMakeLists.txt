@@ -5,8 +5,8 @@ set(SRCS
             break_points.cpp
             emu_window.cpp
             file_util.cpp
+            framebuffer_layout.cpp
             hash.cpp
-            key_map.cpp
             logging/filter.cpp
             logging/text_formatter.cpp
             logging/backend.cpp
@@ -35,8 +35,8 @@ set(HEADERS
             common_types.h
             emu_window.h
             file_util.h
+            framebuffer_layout.h
             hash.h
-            key_map.h
             linear_disk_cache.h
             logging/text_formatter.h
             logging/filter.h
