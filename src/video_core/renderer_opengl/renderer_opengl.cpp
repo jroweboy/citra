@@ -490,7 +490,7 @@ bool RendererOpenGL::Init() {
     LOG_INFO(Render_OpenGL, "GL_VERSION: %s", glGetString(GL_VERSION));
     LOG_INFO(Render_OpenGL, "GL_VENDOR: %s", glGetString(GL_VENDOR));
     LOG_INFO(Render_OpenGL, "GL_RENDERER: %s", glGetString(GL_RENDERER));
-    if (!GLAD_GL_VERSION_3_1) {
+    if (!GLAD_GL_VERSION_3_3) {
         return false;
     }
 
