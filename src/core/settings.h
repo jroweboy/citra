@@ -131,6 +131,7 @@ struct Values {
     float pad_circle_modifier_scale;
 
     // Core
+    bool use_cpu_jit;
     int frame_skip;
 
     // Data Storage
