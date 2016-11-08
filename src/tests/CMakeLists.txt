@@ -1,4 +1,5 @@
 set(SRCS
+            test_a.cpp
             tests.cpp
             )
 
