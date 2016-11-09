@@ -91,11 +91,30 @@ void IsLegacyPowerOff(Interface* self);
 
 /**
  * PTM::CheckNew3DS service function
+ *  Inputs:
+ *      0 : Header code [0x040A0000]
  *  Outputs:
- *      1: Result code, 0 on success, otherwise error code
- *      2: u8 output: 0 = Old3DS, 1 = New3DS.
+ *      0 : Header code
+ *      1 : Result code, 0 on success, otherwise error code
+ *      2 : u8 output: 0 = Old3DS, 1 = New3DS.
  */
 void CheckNew3DS(Interface* self);
+
+/*
+ * PTM::ConfigureNew3DSCPU service function
+ * Inputs:
+ *      0 : Header code [0x08180040]
+ *      1 : u8 value, only bit0-1 are used here.
+ *          Bit 0 enables higher core clock, and bit 1 enables additional (L2) cache.
+ * Outputs:
+ *      0 : Header code
+ *      1 : Result code
+ * Note:
+ *     This just uses svcKernelSetState with Type10 where Param0=<input u8 value from the cmd>.
+ *     This command is implemented in the Old3DS PTM sysmodule too,
+ *     but the above type is only implemented in the New3DS ARM11-kernel.
+ */
+void ConfigureNew3DSCPU(Interface* self);
 
 /// Initialize the PTM service
 void Init();

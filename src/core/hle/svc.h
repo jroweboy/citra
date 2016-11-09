@@ -9,6 +9,8 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // SVC types
 
+union ResultCode;
+
 struct MemoryInfo {
     u32 base_address;
     u32 size;
@@ -54,6 +56,28 @@ enum class SystemInfoMemUsageRegion {
     BASE = 3,
 };
 
+enum class KernelSetStateType : u32 {
+    Type0 = 0,
+    Type1 = 1,
+    Type2 = 2,
+    Type3 = 3,
+    Type4 = 4,
+    Type5 = 5,
+    Type6 = 6,
+    Type7 = 7,
+    Type8 = 8,
+    Type9 = 9,
+    ConfigureNew3DSCPU = 10
+};
+
 void CallSVC(u32 immediate);
+
+/**
+ * SVC::KernelSetState
+ * Note: The type determines the meaning of each param
+ *       0xF8C007F4    Invalid type/param0-param3 input for svcKernelSetState.
+ *       This is also returned for those syscalls marked as stubs.
+ */
+ResultCode KernelSetState(u32 type, u32 param0, u32 param1, u32 param2);
 
 } // namespace
