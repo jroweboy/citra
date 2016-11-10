@@ -38,6 +38,25 @@ static QVariant GetDataForColumn(int col, const AggregatedDuration& duration) {
     }
 }
 
+static QVariant GetFpsDataForColumn(int col, const AggregatedDuration& duration) {
+    static auto get_fps = [](Duration dur) -> float {
+        using FloatMs = std::chrono::duration<float, std::chrono::milliseconds::period>;
+        float fps = 1000/std::chrono::duration_cast<FloatMs>(dur).count();
+        return fps;
+    };
+
+    switch (col) {
+    case 1:
+        return get_fps(duration.avg) ;
+    case 2:
+        return get_fps(duration.min);
+    case 3:
+        return get_fps(duration.max);
+    default:
+        return QVariant();
+    }
+}
+
 ProfilerModel::ProfilerModel(QObject* parent) : QAbstractItemModel(parent) {
     updateProfilingInfo();
 }
@@ -75,7 +94,7 @@ int ProfilerModel::rowCount(const QModelIndex& parent) const {
     if (parent.isValid()) {
         return 0;
     } else {
-        return 2;
+        return 3;
     }
 }
 
@@ -92,6 +111,14 @@ QVariant ProfilerModel::data(const QModelIndex& index, int role) const {
                 return tr("Frame (with swapping)");
             } else {
                 return GetDataForColumn(index.column(), results.interframe_time);
+            }
+        }
+        else if (index.row() == 2) {
+            if (index.column() == 0) {
+                return tr("Frame per second, fps");
+            }
+            else {
+                return GetFpsDataForColumn(index.column(), results.frame_time);
             }
         }
     }
