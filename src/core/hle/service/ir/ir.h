@@ -51,6 +51,9 @@ void FinalizeIrNop(Interface* self);
  */
 void GetConnectionStatusEvent(Interface* self);
 
+void GetSendEvent(Interface* self);
+void GetReceiveEvent(Interface* self);
+
 /**
  * IR::Disconnect service function
  *  Outputs:
