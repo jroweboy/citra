@@ -22,8 +22,6 @@ struct ProfilingFrameResult {
     /// Time spent processing a frame, excluding VSync
     Duration frame_time;
 
-    /// Frames per second
-    //float fps;
 };
 
 class ProfilingManager final {
