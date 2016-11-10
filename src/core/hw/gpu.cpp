@@ -269,7 +269,12 @@ static void DisplayTransfer(const Regs::DisplayTransferConfig& config) {
                                  out_coarse_y * out_stride;
                 }
             }
-
+			
+                        if (!dst_pointer) {
+                            LOG_CRITICAL(HW_GPU, "Invalid address %08x", dst_pointer);
+                            break;
+                        }
+						
             const u8* src_pixel = src_pointer + src_offset;
             src_color = DecodePixel(config.input_format, src_pixel);
             if (config.scaling == config.ScaleX) {
@@ -541,9 +546,6 @@ static void VBlankCallback(u64 userdata, int cycles_late) {
     // two different intervals.
     GSP_GPU::SignalInterrupt(GSP_GPU::InterruptId::PDC0);
     GSP_GPU::SignalInterrupt(GSP_GPU::InterruptId::PDC1);
-
-    // Check for user input updates
-    Service::HID::Update();
 
     // Reschedule recurrent event
     CoreTiming::ScheduleEvent(frame_ticks - cycles_late, vblank_event);

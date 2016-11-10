@@ -20,7 +20,6 @@ void ConfigureDebug::setConfiguration() {
 }
 
 void ConfigureDebug::applyConfiguration() {
-    Settings::values.use_gdbstub = ui->toggle_gdbstub->isChecked();
-    Settings::values.gdbstub_port = ui->gdbport_spinbox->value();
-    Settings::Apply();
+	Settings::values.use_gdbstub = ui->toggle_gdbstub->isChecked();
+	Settings::values.gdbstub_port = ui->gdbport_spinbox->value();
 }

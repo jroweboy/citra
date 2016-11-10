@@ -15,10 +15,9 @@ struct ACConfig {
     std::array<u8, 0x200> data;
 };
 
-static ACConfig default_config{};
+static ACConfig default_config = {};
 
-static bool ac_connected = false;
-
+static bool ac_connected;
 static Kernel::SharedPtr<Kernel::Event> close_event;
 static Kernel::SharedPtr<Kernel::Event> connect_event;
 static Kernel::SharedPtr<Kernel::Event> disconnect_event;
@@ -243,6 +242,7 @@ const Interface::FunctionInfo FunctionTable[] = {
     {0x000E0042, nullptr, "GetCurrentAPInfo"},
     {0x00100042, nullptr, "GetCurrentNZoneInfo"},
     {0x00110042, nullptr, "GetNZoneApNumService"},
+    {0x00130042, nullptr, "GetConnectingHotspotSubset"},
     {0x001D0042, nullptr, "ScanAPs"},
     {0x00240042, nullptr, "AddDenyApType"},
     {0x00270002, GetInfraPriority, "GetInfraPriority"},

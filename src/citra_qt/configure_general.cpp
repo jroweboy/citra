@@ -31,5 +31,4 @@ void ConfigureGeneral::applyConfiguration() {
     UISettings::values.confirm_before_closing = ui->toggle_check_exit->isChecked();
     Settings::values.region_value = ui->region_combobox->currentIndex();
     Settings::values.use_cpu_jit = ui->toggle_cpu_jit->isChecked();
-    Settings::Apply();
 }

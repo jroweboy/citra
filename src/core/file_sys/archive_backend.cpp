@@ -37,6 +37,33 @@ Path::Path(LowPathType type, u32 size, u32 pointer) : type(type) {
     }
 }
 
+Path::Path(LowPathType type, u32 size, const u8* pointer) : type(type) {
+    switch (type) {
+    case Binary:
+    {
+        binary = std::vector<u8>(pointer, pointer + size);
+        break;
+    }
+
+    case Char:
+    {
+        const char* data = reinterpret_cast<const char*>(pointer);
+        string = std::string(data, size - 1); // Data is always null-terminated.
+        break;
+    }
+
+    case Wchar:
+    {
+        const char16_t* data = reinterpret_cast<const char16_t*>(pointer);
+        u16str = std::u16string(data, size/2 - 1); // Data is always null-terminated.
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
 std::string Path::DebugStr() const {
     switch (GetType()) {
     case Invalid:

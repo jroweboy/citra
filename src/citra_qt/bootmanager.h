@@ -8,6 +8,7 @@
 #include <QGLWidget>
 #include <QThread>
 #include "common/emu_window.h"
+#include "common/motion_emu.h"
 #include "common/thread.h"
 
 class QKeyEvent;
@@ -123,9 +124,6 @@ public:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
-
-    void ReloadSetKeymaps() override;
-
     void OnClientAreaResized(unsigned width, unsigned height);
 
     void InitRenderTarget();
@@ -153,6 +151,9 @@ private:
     int keyboard_id;
 
     EmuThread* emu_thread;
+
+    /// Motion sensors emulation
+    std::unique_ptr<Motion::MotionEmu> motion_emu;
 
 protected:
     void showEvent(QShowEvent* event) override;
