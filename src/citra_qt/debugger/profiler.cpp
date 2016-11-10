@@ -42,6 +42,11 @@ static QVariant GetFpsDataForColumn(int col, const AggregatedDuration& duration)
     static auto get_fps = [](Duration dur) -> float {
         using FloatMs = std::chrono::duration<float, std::chrono::milliseconds::period>;
         float fps = 1000/std::chrono::duration_cast<FloatMs>(dur).count();
+        if (dur == dur.zero){
+            fps = 0.0;
+        } else if (fps > 60){
+                fps = 60.0000;
+        }
         return fps;
     };
 
@@ -112,8 +117,7 @@ QVariant ProfilerModel::data(const QModelIndex& index, int role) const {
             } else {
                 return GetDataForColumn(index.column(), results.interframe_time);
             }
-        }
-        else if (index.row() == 2) {
+        } else if (index.row() == 2) {
             if (index.column() == 0) {
                 return tr("Frame per second, fps");
             }
