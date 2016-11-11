@@ -3,6 +3,11 @@
 **The issue tracker is not a support forum.** Unless you can provide precise *technical information* regarding an issue, you *should not post in it*. If you need support, first read the [FAQ](https://github.com/citra-emu/citra/wiki/FAQ) and then either visit our IRC channel, [our forum](https://discuss.citra-emu.org/) or ask in a general emulation forum such as [/r/emulation](https://www.reddit.com/r/emulation/). If you post support questions, generic messages to the developers or vague reports without technical details, they will be closed and locked.
 
 If you believe you have a valid issue report, please post text or a screenshot from the log (the console window that opens alongside Citra) and build version (hex string visible in the titlebar and zip filename), as well as your hardware and software information if applicable.
+Please don't report multiple problems per issue and create one issue for each individual problem / game.
+If there are any apparent relations between issues you can use the github reference system (By prefixing other issues and pull requests using '#').
+The title should describe what kind of problem you are experiencing ("missing 3D graphics", "broken 3D colors", "2D graphics broken", "crashes randomly during gameplay", "freeze on save", ...).
+Also include the game in the title (if applicable) so people know wether they even have the game to test it.
+If you have assumptions (such as warnings / errors from the log) about possible causes this should be mentioned in the issue body / discussion, not the title.
 
 # Contributing
 Citra is a brand new project, so we have a great opportunity to keep things clean and well organized early on. As such, coding style is very important when making commits. We run clang-format on our CI to check the code. Please use it to format your code when contributing. However, it doesn't cover all the rules below. Some of them aren't very strict rules since we want to be flexible and we understand that under certain circumstances some of them can be counterproductive. Just try to follow as many of them as possible:

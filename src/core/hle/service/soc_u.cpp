@@ -880,6 +880,80 @@ static void SetSockOpt(Service::Interface* self) {
     cmd_buffer[2] = err;
 }
 
+
+struct DnsAddr {
+    int af;
+    u8 addr[16];
+};
+
+struct DnsServerInfo {
+    DnsAddr entry[4] = { {AF_INET, {8, 8, 8, 8}}, {AF_INET, {8, 8, 4, 4}}, };
+    char domain[256] = {0,};
+};
+
+static DnsServerInfo dns;
+
+static void GetResolverInfo(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    u32 size = cmd_buff[1];
+    u32 resolver_info = cmd_buff[65];
+    Memory::WriteBlock(resolver_info, &dns, sizeof(DnsServerInfo));
+
+    cmd_buff[1] = RESULT_SUCCESS.raw;
+    cmd_buff[2] = 0;
+    LOG_WARNING(Service_SOC, "(STUBBED) called, size=0x%X, addr=0x%08X", size, resolver_info);
+}
+
+enum class NetworkOpt : u32 {
+    NETOPT_MAC_ADDRESS = 0x1004,
+    NETOPT_ARP_TABLE = 0x3002,
+    NETOPT_IP_ADDR_TABLE = 0x4003,
+    NETOPT_IP_MTU = 0x4004,
+    NETOPT_ROUTING_NUMBER = 0x4005,
+    NETOPT_ROUTING_TABLE = 0x4006,
+    NETOPT_UDP_NUMBER = 0x8002,
+    NETOPT_UDP_TABLE = 0x8003,
+    NETOPT_TCP_NUMBER = 0x9002,
+    NETOPT_TCP_TABLE = 0x9003,
+    NETOPT_DNS_TABLE = 0xB003,
+    NETOPT_DHCP_LEASE_TIME = 0xC001,
+};
+
+// GetNetworkOpt( s32* rval, s32 level, s32 optname, u8 optval[], s32* optlen );
+//                         a2          a3         a4           a5          a6
+static void GetNetworkOpt(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+    u32 level = cmd_buff[1]; // 0xFFFE
+    u32 optname = cmd_buff[2];
+    u32 size = cmd_buff[3];
+
+    u32 optval = cmd_buff[65];
+
+    NetworkOpt no = static_cast<NetworkOpt>(optname);
+    switch(no) {
+    case NetworkOpt::NETOPT_ROUTING_NUMBER: {
+        u32 num = 1;
+        Memory::WriteBlock(optval, &num, 4);
+        cmd_buff[2] = 0;
+        cmd_buff[3] = 4;
+    }
+        break;
+    case NetworkOpt::NETOPT_ROUTING_TABLE: {
+        u8 gateway[4] = { 1, 1, 1, 1 };
+        Memory::ZeroBlock(optval, size);
+        Memory::WriteBlock(optval, gateway, sizeof(gateway));
+        cmd_buff[2] = 0;
+        cmd_buff[3] = sizeof(gateway);
+    }
+        break;
+    default:
+        break;
+    }
+    cmd_buff[1] = RESULT_SUCCESS.raw;
+    LOG_WARNING(Service_SOC, "(STUBBED) called, optname=0x%X, addr=0x%08X", optname, optval);
+}
+
 const Interface::FunctionInfo FunctionTable[] = {
     {0x00010044, InitializeSockets, "InitializeSockets"},
     {0x000200C2, Socket, "Socket"},
@@ -906,12 +980,12 @@ const Interface::FunctionInfo FunctionTable[] = {
     {0x00170082, GetSockName, "GetSockName"},
     {0x00180082, GetPeerName, "GetPeerName"},
     {0x00190000, ShutdownSockets, "ShutdownSockets"},
-    {0x001A00C0, nullptr, "GetNetworkOpt"},
+    {0x001A00C0, GetNetworkOpt, "GetNetworkOpt"},
     {0x001B0040, nullptr, "ICMPSocket"},
     {0x001C0104, nullptr, "ICMPPing"},
     {0x001D0040, nullptr, "ICMPCancel"},
     {0x001E0040, nullptr, "ICMPClose"},
-    {0x001F0040, nullptr, "GetResolverInfo"},
+    {0x001F0040, GetResolverInfo, "GetResolverInfo"},
     {0x00210002, nullptr, "CloseSockets"},
     {0x00230040, nullptr, "AddGlobalSocket"},
 };

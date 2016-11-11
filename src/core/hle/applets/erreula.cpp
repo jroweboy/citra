@@ -49,14 +49,35 @@ ResultCode ErrEula::ReceiveParameter(const Service::APT::MessageParameter& param
 ResultCode ErrEula::StartImpl(const Service::APT::AppletStartupParameter& parameter) {
     started = true;
 
-    // TODO(Subv): Set the expected fields in the response buffer before resending it to the
-    // application.
-    // TODO(Subv): Reverse the parameter format for the ErrEula applet
+    ASSERT_MSG(parameter.buffer.size() == sizeof(config),
+               "The size of the parameter (ErrEulaConfig) is wrong");
+
+    memcpy(&config, parameter.buffer.data(), parameter.buffer.size());
+    switch (config.error_type) {
+    case ErrorType::ErrorCode:
+        LOG_ERROR(Service_APT, "ErrEula error_code = 0x%08X", config.error_code);
+        break;
+    case ErrorType::LocalizedErrorText:
+    case ErrorType::ErrorText: {
+        std::string error = Common::UTF16ToUTF8(config.error_text);
+        LOG_ERROR(Service_APT, "ErrEula error code: 0x%X text: %s", config.error_code,
+                  error.c_str());
+        break;
+    }
+    case ErrorType::Agree:
+    case ErrorType::Eula:
+    case ErrorType::EulaDrawOnly:
+    case ErrorType::EulaFirstBoot:
+        LOG_WARNING(Service_APT, "ErrEula eula accepted");
+        break;
+    }
 
     // Let the application know that we're closing
     Service::APT::MessageParameter message;
-    message.buffer.resize(parameter.buffer.size());
-    std::fill(message.buffer.begin(), message.buffer.end(), 0);
+    message.buffer.resize(sizeof(config));
+    config.return_code = ReturnCode::None;
+
+    std::memcpy(message.buffer.data(), &config, message.buffer.size());
     message.signal = static_cast<u32>(Service::APT::SignalType::LibAppClosed);
     message.destination_id = static_cast<u32>(Service::APT::AppletId::Application);
     message.sender_id = static_cast<u32>(id);

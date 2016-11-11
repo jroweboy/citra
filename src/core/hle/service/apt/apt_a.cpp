@@ -35,6 +35,7 @@ const Interface::FunctionInfo FunctionTable[] = {
     {0x00510080, GetStartupArgument, "GetStartupArgument"},
     {0x00550040, SetScreenCapPostPermission, "SetScreenCapPostPermission"},
     {0x00560000, GetScreenCapPostPermission, "GetScreenCapPostPermission"},
+    {0x00580002, nullptr, "GetProgramID"},
     {0x01010000, CheckNew3DSApp, "CheckNew3DSApp"},
     {0x01020000, CheckNew3DS, "CheckNew3DS"},
 };

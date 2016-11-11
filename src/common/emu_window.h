@@ -6,8 +6,11 @@
 
 #include <tuple>
 #include <utility>
+
 #include "common/common_types.h"
+#include "common/framebuffer_layout.h"
 #include "common/math_util.h"
+
 #include "core/hle/service/hid/hid.h"
 
 /**
@@ -28,32 +31,24 @@
  * - DO NOT TREAT THIS CLASS AS A GUI TOOLKIT ABSTRACTION LAYER. That's not what it is. Please
  *   re-read the upper points again and think about it if you don't see this.
  */
-class EmuWindow {
+class EmuWindow
+{
 public:
     /// Data structure to store emuwindow configuration
     struct WindowConfig {
-        bool fullscreen;
-        int res_width;
-        int res_height;
-        std::pair<unsigned, unsigned> min_client_area_size;
+        bool    fullscreen;
+        int     res_width;
+        int     res_height;
+        std::pair<unsigned,unsigned> min_client_area_size;
     };
+	
+    enum StereoscopicMode { LeftOnly, RightOnly, Anaglyph, SideBySide };
 
-    /// Describes the layout of the window framebuffer (size and top/bottom screen positions)
-    struct FramebufferLayout {
-
-        /**
-         * Factory method for constructing a default FramebufferLayout
-         * @param width Window framebuffer width in pixels
-         * @param height Window framebuffer height in pixels
-         * @return Newly created FramebufferLayout object with default screen regions initialized
-         */
-        static FramebufferLayout DefaultScreenLayout(unsigned width, unsigned height);
-
-        unsigned width;
-        unsigned height;
-        MathUtil::Rectangle<unsigned> top_screen;
-        MathUtil::Rectangle<unsigned> bottom_screen;
-    };
+    /**
+     * Convenience method to update the VideoCore EmuWindow
+     * Read from the current settings to determine which layout to use.
+     */
+    void UpdateCurrentFramebufferLayout(unsigned width, unsigned height);
 
     /// Swap buffers to display the next frame
     virtual void SwapBuffers() = 0;
@@ -66,30 +61,6 @@ public:
 
     /// Releases (dunno if this is the "right" word) the GLFW context from the caller thread
     virtual void DoneCurrent() = 0;
-
-    virtual void ReloadSetKeymaps() = 0;
-
-    /**
-     * Signals a button press action to the HID module.
-     * @param pad_state indicates which button to press
-     * @note only handles real buttons (A/B/X/Y/...), excluding analog inputs like the circle pad.
-     */
-    void ButtonPressed(Service::HID::PadState pad_state);
-
-    /**
-     * Signals a button release action to the HID module.
-     * @param pad_state indicates which button to press
-     * @note only handles real buttons (A/B/X/Y/...), excluding analog inputs like the circle pad.
-     */
-    void ButtonReleased(Service::HID::PadState pad_state);
-
-    /**
-     * Signals a circle pad change action to the HID module.
-     * @param x new x-coordinate of the circle pad, in the range [-1.0, 1.0]
-     * @param y new y-coordinate of the circle pad, in the range [-1.0, 1.0]
-     * @note the coordinates will be normalized if the radius is larger than 1
-     */
-    void CirclePadUpdated(float x, float y);
 
     /**
      * Signal that a touch pressed event has occurred (e.g. mouse click pressed)
@@ -108,37 +79,53 @@ public:
      */
     void TouchMoved(unsigned framebuffer_x, unsigned framebuffer_y);
 
-    /**
-     * Gets the current pad state (which buttons are pressed).
-     * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @note This doesn't include analog input like circle pad direction
-     * @todo Fix this function to be thread-safe.
-     * @return PadState object indicating the current pad state
+	/**
+     * Signal accelerometer state has changed.
+     * @param x X-axis accelerometer value
+     * @param y Y-axis accelerometer value
+     * @param z Z-axis accelerometer value
+     * @note all values are in unit of g (gravitational acceleration).
+     *    e.g. x = 1.0 means 9.8m/s^2 in x direction.
+     * @see GetAccelerometerState for axis explanation.
      */
-    Service::HID::PadState GetPadState() const {
-        return pad_state;
-    }
+	void AccelerometerChanged(float x, float y, float z);
+	
+    /**
+     * Signal gyroscope state has changed.
+     * @param x X-axis accelerometer value
+     * @param y Y-axis accelerometer value
+     * @param z Z-axis accelerometer value
+     * @note all values are in deg/sec.
+     * @see GetGyroscopeState for axis explanation.
+     */
+		void GyroscopeChanged(float x, float y, float z);
 
     /**
-     * Gets the current circle pad state.
-     * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @todo Fix this function to be thread-safe.
-     * @return std::tuple of (x, y), where `x` and `y` are the circle pad coordinates
+     * Signal accelerometer state has changed.
+     * @param x X-axis accelerometer value
+     * @param y Y-axis accelerometer value
+     * @param z Z-axis accelerometer value
+     * @note all values are in unit of g (gravitational acceleration).
+     *    e.g. x = 1.0 means 9.8m/s^2 in x direction.
+     * @see GetAccelerometerState for axis explanation.
      */
-    std::tuple<s16, s16> GetCirclePadState() const {
-        return std::make_tuple(circle_pad_x, circle_pad_y);
-    }
 
     /**
-     * Gets the current touch screen state (touch X/Y coordinates and whether or not it is pressed).
-     * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @todo Fix this function to be thread-safe.
-     * @return std::tuple of (x, y, pressed) where `x` and `y` are the touch coordinates and
-     *         `pressed` is true if the touch screen is currently being pressed
+     * Signal gyroscope state has changed.
+     * @param x X-axis accelerometer value
+     * @param y Y-axis accelerometer value
+     * @param z Z-axis accelerometer value
+     * @note all values are in deg/sec.
+     * @see GetGyroscopeState for axis explanation.
      */
-    std::tuple<u16, u16, bool> GetTouchState() const {
-        return std::make_tuple(touch_x, touch_y, touch_pressed);
-    }
+
+    /**
+     * Signal that a 3d depth slider change has occurred
+     * @param value new value for 3d depth slider;
+     */
+	 
+    void DepthSliderChanged(float value);
+    void StereoscopicModeChanged(StereoscopicMode mode);
 
     /**
      * Gets the current accelerometer state (acceleration along each three axis).
@@ -150,12 +137,11 @@ public:
      *   1 unit of return value = 1/512 g (measured by hw test),
      *   where g is the gravitational acceleration (9.8 m/sec2).
      * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @todo Implement accelerometer input in front-end.
+     * @todo Fix this function to be thread-safe.
      * @return std::tuple of (x, y, z)
      */
-    std::tuple<s16, s16, s16> GetAccelerometerState() const {
-        // stubbed
-        return std::make_tuple(0, -512, 0);
+    std::tuple<s16, s16, s16> GetAccelerometerState() {
+        return std::make_tuple(accel_x, accel_y, accel_z);
     }
 
     /**
@@ -169,12 +155,11 @@ public:
      *   1 unit of return value = (1/coef) deg/sec,
      *   where coef is the return value of GetGyroscopeRawToDpsCoefficient().
      * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @todo Implement gyroscope input in front-end.
+     * @todo Fix this function to be thread-safe.
      * @return std::tuple of (x, y, z)
      */
-    std::tuple<s16, s16, s16> GetGyroscopeState() const {
-        // stubbed
-        return std::make_tuple(0, 0, 0);
+    std::tuple<s16, s16, s16> GetGyroscopeState() {
+        return std::make_tuple(gyro_x, gyro_y, gyro_z);
     }
 
     /**
@@ -187,21 +172,34 @@ public:
     f32 GetGyroscopeRawToDpsCoefficient() const {
         return 14.375f; // taken from hw test, and gyroscope's document
     }
+	
+	/**
+     * Gets the value of the 3D depth slider.
+     * @return float-type value
+     */
+    f32 GetDepthSliderValue() const {
+        return depth_slider;
+    }
+
+    /**
+     * Gets the stereoscopic mode.
+     * @return StereoscopicMode value
+     */
+    StereoscopicMode GetStereoscopicMode() const {
+        return stereoscopic_mode;
+    }
 
     /**
      * Returns currently active configuration.
-     * @note Accesses to the returned object need not be consistent because it may be modified in
-     * another thread
+     * @note Accesses to the returned object need not be consistent because it may be modified in another thread
      */
     const WindowConfig& GetActiveConfig() const {
         return active_config;
     }
 
     /**
-     * Requests the internal configuration to be replaced by the specified argument at some point in
-     * the future.
-     * @note This method is thread-safe, because it delays configuration changes to the GUI event
-     * loop. Hence there is no guarantee on when the requested configuration will be active.
+     * Requests the internal configuration to be replaced by the specified argument at some point in the future.
+     * @note This method is thread-safe, because it delays configuration changes to the GUI event loop. Hence there is no guarantee on when the requested configuration will be active.
      */
     void SetConfig(const WindowConfig& val) {
         config = val;
@@ -220,12 +218,14 @@ protected:
         // TODO: Find a better place to set this.
         config.min_client_area_size = std::make_pair(400u, 480u);
         active_config = config;
-        pad_state.hex = 0;
-        touch_x = 0;
-        touch_y = 0;
-        circle_pad_x = 0;
-        circle_pad_y = 0;
-        touch_pressed = false;
+        accel_x = 0;
+        accel_y = -512;
+        accel_z = 0;
+        gyro_x = 0;
+        gyro_y = 0;
+        gyro_z = 0;
+        depth_slider = 0.0f;
+        stereoscopic_mode = Anaglyph;
     }
     virtual ~EmuWindow() {}
 
@@ -258,7 +258,7 @@ protected:
      * Update internal client area size with the given parameter.
      * @note EmuWindow implementations will usually use this in window resize event handlers.
      */
-    void NotifyClientAreaSizeChanged(const std::pair<unsigned, unsigned>& size) {
+    void NotifyClientAreaSizeChanged(const std::pair<unsigned,unsigned>& size) {
         client_area_width = size.first;
         client_area_height = size.second;
     }
@@ -266,35 +266,36 @@ protected:
 private:
     /**
      * Handler called when the minimal client area was requested to be changed via SetConfig.
-     * For the request to be honored, EmuWindow implementations will usually reimplement this
-     * function.
+     * For the request to be honored, EmuWindow implementations will usually reimplement this function.
      */
-    virtual void OnMinimalClientAreaChangeRequest(
-        const std::pair<unsigned, unsigned>& minimal_size) {
+    virtual void OnMinimalClientAreaChangeRequest(const std::pair<unsigned,unsigned>& minimal_size) {
         // By default, ignore this request and do nothing.
     }
 
     FramebufferLayout framebuffer_layout; ///< Current framebuffer layout
 
-    unsigned client_area_width;  ///< Current client width, should be set by window impl.
-    unsigned client_area_height; ///< Current client height, should be set by window impl.
+    unsigned client_area_width;    ///< Current client width, should be set by window impl.
+    unsigned client_area_height;   ///< Current client height, should be set by window impl.
 
-    WindowConfig config;        ///< Internal configuration (changes pending for being applied in
-                                /// ProcessConfigurationChanges)
-    WindowConfig active_config; ///< Internal active configuration
+    WindowConfig config;         ///< Internal configuration (changes pending for being applied in ProcessConfigurationChanges)
+    WindowConfig active_config;  ///< Internal active configuration
 
-    bool touch_pressed; ///< True if touchpad area is currently pressed, otherwise false
+    bool touch_pressed;          ///< True if touchpad area is currently pressed, otherwise false
+	
+    s16 accel_x; ///< Accelerometer X-axis value in native 3DS units
+    s16 accel_y; ///< Accelerometer Y-axis value in native 3DS units
+    s16 accel_z; ///< Accelerometer Z-axis value in native 3DS units
 
-    u16 touch_x; ///< Touchpad X-position in native 3DS pixel coordinates (0-320)
-    u16 touch_y; ///< Touchpad Y-position in native 3DS pixel coordinates (0-240)
+    s16 gyro_x; ///< Gyroscope X-axis value in native 3DS units
+    s16 gyro_y; ///< Gyroscope Y-axis value in native 3DS units
+    s16 gyro_z; ///< Gyroscope Z-axis value in native 3DS units
+	
+    f32 depth_slider; ///< 3D depth slider (0.0-1.0)
 
-    s16 circle_pad_x; ///< Circle pad X-position in native 3DS pixel coordinates (-156 - 156)
-    s16 circle_pad_y; ///< Circle pad Y-position in native 3DS pixel coordinates (-156 - 156)
+    StereoscopicMode stereoscopic_mode; ///< stereoscopic mode
 
-    /**
-     * Clip the provided coordinates to be inside the touchscreen area.
-     */
-    std::tuple<unsigned, unsigned> ClipToTouchScreen(unsigned new_x, unsigned new_y);
-
-    Service::HID::PadState pad_state;
+   /**
+    * Clip the provided coordinates to be inside the touchscreen area.
+    */
+    std::tuple<unsigned,unsigned> ClipToTouchScreen(unsigned new_x, unsigned new_y);
 };

@@ -16,6 +16,8 @@
 #include "core/memory.h"
 #include "video_core/video_core.h"
 
+#include <iostream>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace HLE {
@@ -78,14 +80,16 @@ void SoftwareKeyboard::Update() {
     // TODO(Subv): Handle input using the touch events from the HID module
 
     // TODO(Subv): Remove this hardcoded text
-    std::u16string text = Common::UTF8ToUTF16("Citra");
+    std::string ctext;
+    std::getline(std::cin, ctext, '\n');
+    std::u16string text = Common::UTF8ToUTF16(ctext);
     memcpy(text_memory->GetPointer(), text.c_str(), text.length() * sizeof(char16_t));
 
     // TODO(Subv): Ask for input and write it to the shared memory
     // TODO(Subv): Find out what are the possible values for the return code,
     // some games seem to check for a hardcoded 2
     config.return_code = 2;
-    config.text_length = 6;
+    config.text_length = text.length();
     config.text_offset = 0;
 
     // TODO(Subv): We're finalizing the applet immediately after it's started,

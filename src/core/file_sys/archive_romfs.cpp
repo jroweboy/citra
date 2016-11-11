@@ -14,7 +14,8 @@
 
 namespace FileSys {
 
-ArchiveFactory_RomFS::ArchiveFactory_RomFS(Loader::AppLoader& app_loader) {
+ArchiveFactory_RomFS::ArchiveFactory_RomFS(Loader::AppLoader& app_loader, AES::AesContext ac)
+    : aes_context(ac) {
     // Load the RomFS from the app
     if (Loader::ResultStatus::Success != app_loader.ReadRomFS(romfs_file, data_offset, data_size)) {
         LOG_ERROR(Service_FS, "Unable to read RomFS!");
@@ -22,7 +23,7 @@ ArchiveFactory_RomFS::ArchiveFactory_RomFS(Loader::AppLoader& app_loader) {
 }
 
 ResultVal<std::unique_ptr<ArchiveBackend>> ArchiveFactory_RomFS::Open(const Path& path) {
-    auto archive = std::make_unique<IVFCArchive>(romfs_file, data_offset, data_size);
+    auto archive = std::make_unique<IVFCArchive>(romfs_file, data_offset, data_size, aes_context);
     return MakeResult<std::unique_ptr<ArchiveBackend>>(std::move(archive));
 }
 
