@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "common/common_types.h"
+#include "core/aes/aes.h"
 #include "core/file_sys/archive_backend.h"
 #include "core/hle/result.h"
 #include "core/loader/loader.h"
@@ -20,7 +21,7 @@ namespace FileSys {
 /// File system interface to the RomFS archive
 class ArchiveFactory_RomFS final : public ArchiveFactory {
 public:
-    ArchiveFactory_RomFS(Loader::AppLoader& app_loader);
+    ArchiveFactory_RomFS(Loader::AppLoader& app_loader, AES::AesContext ac = AES::AesContext());
 
     std::string GetName() const override {
         return "RomFS";
@@ -33,6 +34,7 @@ private:
     std::shared_ptr<FileUtil::IOFile> romfs_file;
     u64 data_offset;
     u64 data_size;
+    AES::AesContext aes_context;
 };
 
 } // namespace FileSys

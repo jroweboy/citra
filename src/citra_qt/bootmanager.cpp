@@ -9,13 +9,17 @@
 #endif
 
 #include "citra_qt/bootmanager.h"
-#include "common/key_map.h"
+
 #include "common/microprofile.h"
 #include "common/scm_rev.h"
 #include "common/string_util.h"
 #include "core/core.h"
 #include "core/settings.h"
 #include "core/system.h"
+
+#include "input_core/devices/keyboard.h"
+#include "input_core/input_core.h"
+
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/video_core.h"
 
@@ -80,7 +84,9 @@ void EmuThread::run() {
 class GGLWidgetInternal : public QGLWidget {
 public:
     GGLWidgetInternal(QGLFormat fmt, GRenderWindow* parent)
-        : QGLWidget(fmt, parent), parent(parent) {}
+        : QGLWidget(fmt, parent), parent(parent) {
+        this->setMouseTracking(true);
+    }
 
     void paintEvent(QPaintEvent* ev) override {
         if (do_painting) {
@@ -112,8 +118,34 @@ GRenderWindow::GRenderWindow(QWidget* parent, EmuThread* emu_thread)
         Common::StringFromFormat("Citra | %s-%s", Common::g_scm_branch, Common::g_scm_desc);
     setWindowTitle(QString::fromStdString(window_title));
 
-    keyboard_id = KeyMap::NewDeviceId();
-    ReloadSetKeymaps();
+    keyboard_id = 0;
+	
+    this->setMouseTracking(true);
+    parent->setMouseTracking(true);
+
+    // TODO: One of these flags might be interesting: WA_OpaquePaintEvent, WA_NoBackground,
+    // WA_DontShowOnScreen, WA_DeleteOnClose
+    QGLFormat fmt;
+    fmt.setVersion(3, 3);
+    fmt.setProfile(QGLFormat::CoreProfile);
+    // Requests a forward-compatible context, which is required to get a 3.2+ context on OS X
+    fmt.setOption(QGL::NoDeprecatedFunctions);
+
+    child = new GGLWidgetInternal(fmt, this);
+    QBoxLayout* layout = new QHBoxLayout(this);
+
+    resize(VideoCore::kScreenTopWidth,
+           VideoCore::kScreenTopHeight + VideoCore::kScreenBottomHeight);
+    layout->addWidget(child);
+    layout->setMargin(0);
+    setLayout(layout);
+
+    OnMinimalClientAreaChangeRequest(GetActiveConfig().min_client_area_size);
+
+    OnFramebufferSizeChanged();
+    NotifyClientAreaSizeChanged(std::pair<unsigned, unsigned>(child->width(), child->height()));
+
+    BackupGeometry();
 }
 
 void GRenderWindow::moveContext() {
@@ -161,9 +193,7 @@ void GRenderWindow::OnFramebufferSizeChanged() {
     qreal pixelRatio = windowPixelRatio();
     unsigned width = child->QPaintDevice::width() * pixelRatio;
     unsigned height = child->QPaintDevice::height() * pixelRatio;
-
-    NotifyFramebufferLayoutChanged(
-        EmuWindow::FramebufferLayout::DefaultScreenLayout(width, height));
+	UpdateCurrentFramebufferLayout(width, height);
 }
 
 void GRenderWindow::BackupGeometry() {
@@ -200,24 +230,33 @@ qreal GRenderWindow::windowPixelRatio() {
 }
 
 void GRenderWindow::closeEvent(QCloseEvent* event) {
+    motion_emu = nullptr;
     emit Closed();
     QWidget::closeEvent(event);
 }
 
 void GRenderWindow::keyPressEvent(QKeyEvent* event) {
-    KeyMap::PressKey(*this, {event->key(), keyboard_id});
+    auto keyboard = InputCore::GetKeyboard();
+    KeyboardKey param =
+        KeyboardKey(event->key(), QKeySequence(event->key()).toString().toStdString());
+    keyboard->KeyPressed(param);
 }
 
 void GRenderWindow::keyReleaseEvent(QKeyEvent* event) {
-    KeyMap::ReleaseKey(*this, {event->key(), keyboard_id});
+    auto keyboard = InputCore::GetKeyboard();
+    KeyboardKey param =
+        KeyboardKey(event->key(), QKeySequence(event->key()).toString().toStdString());
+    keyboard->KeyReleased(param);
 }
 
 void GRenderWindow::mousePressEvent(QMouseEvent* event) {
+    auto pos = event->pos();
     if (event->button() == Qt::LeftButton) {
-        auto pos = event->pos();
         qreal pixelRatio = windowPixelRatio();
         this->TouchPressed(static_cast<unsigned>(pos.x() * pixelRatio),
                            static_cast<unsigned>(pos.y() * pixelRatio));
+    } else if (event->button() == Qt::RightButton) {
+        motion_emu->BeginTilt(pos.x(), pos.y());
     }
 }
 
@@ -226,20 +265,14 @@ void GRenderWindow::mouseMoveEvent(QMouseEvent* event) {
     qreal pixelRatio = windowPixelRatio();
     this->TouchMoved(std::max(static_cast<unsigned>(pos.x() * pixelRatio), 0u),
                      std::max(static_cast<unsigned>(pos.y() * pixelRatio), 0u));
+    motion_emu->Tilt(pos.x(), pos.y());
 }
 
 void GRenderWindow::mouseReleaseEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton)
         this->TouchReleased();
-}
-
-void GRenderWindow::ReloadSetKeymaps() {
-    KeyMap::ClearKeyMapping(keyboard_id);
-    for (int i = 0; i < Settings::NativeInput::NUM_INPUTS; ++i) {
-        KeyMap::SetKeyMapping(
-            {Settings::values.input_mappings[Settings::NativeInput::All[i]], keyboard_id},
-            KeyMap::mapping_targets[i]);
-    }
+    else if (event->button() == Qt::RightButton)
+        motion_emu->EndTilt();
 }
 
 void GRenderWindow::OnClientAreaResized(unsigned width, unsigned height) {
@@ -288,11 +321,13 @@ void GRenderWindow::OnMinimalClientAreaChangeRequest(
 }
 
 void GRenderWindow::OnEmulationStarting(EmuThread* emu_thread) {
+    motion_emu = std::make_unique<Motion::MotionEmu>(*this);
     this->emu_thread = emu_thread;
     child->DisablePainting();
 }
 
 void GRenderWindow::OnEmulationStopping() {
+    motion_emu = nullptr;
     emu_thread = nullptr;
     child->EnablePainting();
 }

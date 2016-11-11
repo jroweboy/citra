@@ -47,7 +47,7 @@ struct Regs {
 
     INSERT_PADDING_WORDS(0x10);
 
-    u32 trigger_irq;
+    u32 trigger_irq; // 0x10
 
     INSERT_PADDING_WORDS(0x2f);
 
@@ -60,21 +60,28 @@ struct Regs {
     };
 
     union {
-        BitField<0, 2, CullMode> cull_mode;
+        BitField<0, 2, CullMode> cull_mode; // 0x40
     };
 
-    BitField<0, 24, u32> viewport_size_x;
+    BitField<0, 24, u32> viewport_size_x; // 0x41
+    BitField<0, 24, u32> viewport_invw;   // -0x42
+    BitField<0, 24, u32> viewport_size_y; // 0x43
+    BitField<0, 24, u32> viewport_invh;   // -0x44
 
-    INSERT_PADDING_WORDS(0x1);
+    INSERT_PADDING_WORDS(0x2); // 0x46, 0x46
 
-    BitField<0, 24, u32> viewport_size_y;
+    BitField<0, 1, u32> fragop_flip;        // -0x47 enagle/disable
+    BitField<0, 24, u32> fragop_flip_data0; // -0x48
+    BitField<0, 24, u32> fragop_flip_data1; // -0x49
+    BitField<0, 24, u32> fragop_flip_data2; // -0x4A
+    BitField<0, 24, u32> fragop_flip_data3; // -0x4B
 
-    INSERT_PADDING_WORDS(0x9);
+    INSERT_PADDING_WORDS(0x1); // 0x4C
 
-    BitField<0, 24, u32> viewport_depth_range;      // float24
-    BitField<0, 24, u32> viewport_depth_near_plane; // float24
+    BitField<0, 24, u32> viewport_depth_range;      // float24  0x4D
+    BitField<0, 24, u32> viewport_depth_near_plane; // float24  0x4E
 
-    BitField<0, 3, u32> vs_output_total;
+    BitField<0, 3, u32> vs_output_total; // 0x4F
 
     union VSOutputAttributes {
         // Maps components of output vertex attributes to semantics
@@ -114,9 +121,14 @@ struct Regs {
         BitField<8, 5, Semantic> map_y;
         BitField<16, 5, Semantic> map_z;
         BitField<24, 5, Semantic> map_w;
-    } vs_output_attributes[7];
+    } vs_output_attributes[7]; // 0x50-0x56
 
-    INSERT_PADDING_WORDS(0xe);
+    INSERT_PADDING_WORDS(0xa); // 0x57-0x60
+
+    u32 earlydepth_func;                  // -0x61
+    u32 earlydepth_test1;                 // -0x62
+    BitField<0, 1, u32> earlydepth_clear; // -0x63
+    BitField<0, 1, u32> sh_outattr_mode;  // -0x64
 
     enum class ScissorMode : u32 {
         Disabled = 0,
@@ -137,25 +149,24 @@ struct Regs {
             BitField<0, 16, u32> x2;
             BitField<16, 16, u32> y2;
         };
-    } scissor_test;
+    } scissor_test; // 0x65, 0x66, 0x67
 
     union {
         BitField<0, 10, s32> x;
         BitField<16, 10, s32> y;
-    } viewport_corner;
+    } viewport_corner; // 0x68
 
-    INSERT_PADDING_WORDS(0x1);
+    INSERT_PADDING_WORDS(0x1); // -0x69
 
-    // TODO: early depth
-    INSERT_PADDING_WORDS(0x1);
+    BitField<0, 24, u32> earlydepth_data; // -0x6A
 
-    INSERT_PADDING_WORDS(0x2);
+    INSERT_PADDING_WORDS(0x2); // 0x6B, 0x6C
 
     enum DepthBuffering : u32 {
         WBuffering = 0,
         ZBuffering = 1,
     };
-    BitField<0, 1, DepthBuffering> depthmap_enable;
+    BitField<0, 1, DepthBuffering> depthmap_enable; // 0x6B
 
     INSERT_PADDING_WORDS(0x12);
 
@@ -1128,7 +1139,7 @@ struct Regs {
     // Number of vertices to render
     u32 num_vertices;
 
-    INSERT_PADDING_WORDS(0x1);
+    BitField<0, 2, u32> using_geometry_shader;
 
     // The index of the first vertex to render
     u32 vertex_offset;
@@ -1176,7 +1187,11 @@ struct Regs {
         }
     } command_buffer;
 
-    INSERT_PADDING_WORDS(0x07);
+    INSERT_PADDING_WORDS(0x06);
+
+    enum class VSComMode : u32 { Shared = 0, Exclusive = 1 };
+
+    VSComMode vs_com_mode;
 
     enum class GPUMode : u32 {
         Drawing = 0,
@@ -1185,7 +1200,17 @@ struct Regs {
 
     GPUMode gpu_mode;
 
-    INSERT_PADDING_WORDS(0x18);
+    INSERT_PADDING_WORDS(0x4);
+
+    BitField<0, 4, u32> vs_outmap_total1;
+
+    INSERT_PADDING_WORDS(0x6);
+
+    BitField<0, 4, u32> vs_outmap_total2;
+
+    BitField<0, 4, u32> gsh_misc0;
+
+    INSERT_PADDING_WORDS(0xB);
 
     enum class TriangleTopology : u32 {
         List = 0,
@@ -1194,7 +1219,10 @@ struct Regs {
         Shader = 3, // Programmable setup unit implemented in a geometry shader
     };
 
-    BitField<8, 2, TriangleTopology> triangle_topology;
+    union {
+        BitField<0, 4, u32> vs_outmap_count;
+        BitField<8, 2, TriangleTopology> triangle_topology;
+    };
 
     u32 restart_primitive;
 
@@ -1213,8 +1241,10 @@ struct Regs {
         INSERT_PADDING_WORDS(0x4);
 
         union {
-            // Number of input attributes to shader unit - 1
-            BitField<0, 4, u32> num_input_attributes;
+            BitField<0, 4, u32>
+                num_input_attributes; // Number of input attributes to shader unit - 1
+            BitField<8, 4, u32> use_subdivision;
+            BitField<24, 8, u32> use_geometry_shader;
         };
 
         // Offset to shader program entry point (in words)
@@ -1267,6 +1297,8 @@ struct Regs {
             }
 
             union {
+                u32 setup;
+
                 // Index of the next uniform to write to
                 // TODO: ctrulib uses 8 bits for this, however that seems to yield lots of invalid
                 // indices
@@ -1391,7 +1423,11 @@ ASSERT_REG_POSITION(trigger_draw, 0x22e);
 ASSERT_REG_POSITION(trigger_draw_indexed, 0x22f);
 ASSERT_REG_POSITION(vs_default_attributes_setup, 0x232);
 ASSERT_REG_POSITION(command_buffer, 0x238);
+ASSERT_REG_POSITION(vs_com_mode, 0x244);
 ASSERT_REG_POSITION(gpu_mode, 0x245);
+ASSERT_REG_POSITION(vs_outmap_total1, 0x24A);
+ASSERT_REG_POSITION(vs_outmap_total2, 0x251);
+ASSERT_REG_POSITION(gsh_misc0, 0x252);
 ASSERT_REG_POSITION(triangle_topology, 0x25e);
 ASSERT_REG_POSITION(restart_primitive, 0x25f);
 ASSERT_REG_POSITION(gs, 0x280);

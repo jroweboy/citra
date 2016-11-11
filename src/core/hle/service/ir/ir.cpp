@@ -14,6 +14,8 @@ namespace Service {
 namespace IR {
 
 static Kernel::SharedPtr<Kernel::Event> handle_event;
+static Kernel::SharedPtr<Kernel::Event> send_event;
+static Kernel::SharedPtr<Kernel::Event> receive_event;
 static Kernel::SharedPtr<Kernel::Event> conn_status_event;
 static Kernel::SharedPtr<Kernel::SharedMemory> shared_memory;
 static Kernel::SharedPtr<Kernel::SharedMemory> transfer_shared_memory;
@@ -77,6 +79,24 @@ void GetConnectionStatusEvent(Interface* self) {
     LOG_WARNING(Service_IR, "(STUBBED) called");
 }
 
+void GetSendEvent(Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    cmd_buff[1] = RESULT_SUCCESS.raw;
+    cmd_buff[3] = Kernel::g_handle_table.Create(Service::IR::send_event).MoveFrom();
+
+    LOG_WARNING(Service_IR, "(STUBBED) called");
+}
+
+void GetReceiveEvent(Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    cmd_buff[1] = RESULT_SUCCESS.raw;
+    cmd_buff[3] = Kernel::g_handle_table.Create(Service::IR::receive_event).MoveFrom();
+
+    LOG_WARNING(Service_IR, "(STUBBED) called");
+}
+
 void FinalizeIrNop(Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
@@ -101,6 +121,8 @@ void Init() {
     // Create event handle(s)
     handle_event = Event::Create(ResetType::OneShot, "IR:HandleEvent");
     conn_status_event = Event::Create(ResetType::OneShot, "IR:ConnectionStatusEvent");
+    send_event = Event::Create(ResetType::OneShot, "IR:SendEvent");
+    receive_event = Event::Create(ResetType::OneShot, "IR:ReceiveEvent");
 }
 
 void Shutdown() {
@@ -108,6 +130,8 @@ void Shutdown() {
     shared_memory = nullptr;
     handle_event = nullptr;
     conn_status_event = nullptr;
+    send_event = nullptr;
+    receive_event = nullptr;
 }
 
 } // namespace IR

@@ -37,6 +37,7 @@ void RunLoop(int tight_loop) {
         }
     }
 
+    static int n = 0;
     // If we don't have a currently active thread then don't execute instructions,
     // instead advance to the next event and try to yield to the next thread
     if (Kernel::GetCurrentThread() == nullptr) {
@@ -46,10 +47,15 @@ void RunLoop(int tight_loop) {
         HLE::Reschedule(__func__);
     } else {
         g_app_core->Run(tight_loop);
+        n = ++n % 3;
+        if (!n) {
+            HLE::Reschedule(__func__);
+        }
     }
 
     HW::Update();
     if (HLE::IsReschedulePending()) {
+        // n = 0;
         Kernel::Reschedule();
     }
 }

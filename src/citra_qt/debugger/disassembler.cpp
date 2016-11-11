@@ -265,7 +265,7 @@ void DisassemblerWidget::OnEmulationStarting(EmuThread* emu_thread) {
 }
 
 void DisassemblerWidget::OnEmulationStopping() {
-    disasm_ui.treeView->setModel(nullptr);
+    // disasm_ui.treeView->setModel(nullptr);
     delete model;
     emu_thread = nullptr;
     setEnabled(false);

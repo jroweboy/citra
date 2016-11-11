@@ -40,8 +40,11 @@ static ScreencapPostPermission screen_capture_post_permission;
 /// Parameter data to be returned in the next call to Glance/ReceiveParameter
 static MessageParameter next_parameter;
 
+bool canceled = false;
+
 void SendParameter(const MessageParameter& parameter) {
     next_parameter = parameter;
+    canceled = false;
     // Signal the event to let the application know that a new parameter is ready to be read
     parameter_event->Signal();
 }
@@ -99,7 +102,7 @@ void NotifyToWait(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
     u32 app_id = cmd_buff[1];
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
-    LOG_WARNING(Service_APT, "(STUBBED) app_id=%u", app_id);
+    LOG_WARNING(Service_APT, "(STUBBED) app_id=0x%X", app_id);
 }
 
 void GetLockHandle(Service::Interface* self) {
@@ -154,7 +157,7 @@ void IsRegistered(Service::Interface* self) {
     } else if (auto applet = HLE::Applets::Applet::Get(static_cast<AppletId>(app_id))) {
         cmd_buff[2] = 1; // Set to registered
     }
-    LOG_WARNING(Service_APT, "(STUBBED) called app_id=0x%08X", app_id);
+    LOG_WARNING(Service_APT, "(STUBBED) called app_id=0x%08X, result=%u", app_id, cmd_buff[2]);
 }
 
 void InquireNotification(Service::Interface* self) {
@@ -208,6 +211,11 @@ void ReceiveParameter(Service::Interface* self) {
     u32 buffer_size = cmd_buff[2];
     VAddr buffer = cmd_buff[0x104 >> 2];
 
+    if (canceled) {
+        cmd_buff[1] = -1;
+        return;
+    }
+
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
     cmd_buff[2] = next_parameter.sender_id;
     cmd_buff[3] = next_parameter.signal;        // Signal type
@@ -229,6 +237,11 @@ void GlanceParameter(Service::Interface* self) {
     u32 app_id = cmd_buff[1];
     u32 buffer_size = cmd_buff[2];
     VAddr buffer = cmd_buff[0x104 >> 2];
+
+    if (canceled) {
+        cmd_buff[1] = -1;
+        return;
+    }
 
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
     cmd_buff[2] = next_parameter.sender_id;
@@ -253,6 +266,8 @@ void CancelParameter(Service::Interface* self) {
     u32 unk = cmd_buff[2];
     u32 flag2 = cmd_buff[3];
     u32 app_id = cmd_buff[4];
+
+    canceled = true;
 
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
     cmd_buff[2] = 1;                  // Set to Success
@@ -477,6 +492,13 @@ void CheckNew3DS(Service::Interface* self) {
     PTM::CheckNew3DS(self);
 
     cmd_buff[0] = IPC::MakeHeader(0x102, 2, 0);
+    LOG_WARNING(Service_APT, "(STUBBED) called");
+}
+
+void Wrap(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    cmd_buff[1] = RESULT_SUCCESS.raw;
     LOG_WARNING(Service_APT, "(STUBBED) called");
 }
 

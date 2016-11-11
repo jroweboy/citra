@@ -19,10 +19,8 @@
 // Loader namespace
 
 namespace Loader {
-
 static const int kMaxSections = 8;   ///< Maximum number of sections (files) in an ExeFs
 static const int kBlockSize = 0x200; ///< Size of ExeFS blocks (in bytes)
-
 /**
  * Get the decompressed size of an LZSS compressed ExeFS file
  * @param buffer Buffer of compressed file
@@ -211,6 +209,15 @@ ResultStatus AppLoader_NCCH::LoadSectionExeFS(const char* name, std::vector<u8>&
                 if (file.ReadBytes(&temp_buffer[0], section.size) != section.size)
                     return ResultStatus::Error;
 
+                // Decrypt Section
+                if (is_crypted) {
+                    int slot = crypto7 ? 0x25 : 0x2C;
+                    auto ctr = ctr_exefs;
+                    AES::AddCtr(ctr, (section.offset + sizeof(ExeFs_Header)) / 16);
+                    AES::AesCtrDecrypt(&temp_buffer[0], section.size,
+                                       AES::ZERO_KEY /*AES::MakeKey(slot, key_y)*/, ctr);
+                }
+
                 // Decompress .code section...
                 u32 decompressed_size = LZSS_GetDecompressedSize(&temp_buffer[0], section.size);
                 buffer.resize(decompressed_size);
@@ -221,6 +228,16 @@ ResultStatus AppLoader_NCCH::LoadSectionExeFS(const char* name, std::vector<u8>&
                 buffer.resize(section.size);
                 if (file.ReadBytes(&buffer[0], section.size) != section.size)
                     return ResultStatus::Error;
+
+                // Decrypt Section
+                // TODO : test this
+                if (is_crypted) {
+                    int slot = (crypto7 && strcmp(section.name, ".code") == 0) ? 0x25 : 0x2C;
+                    auto ctr = ctr_exefs;
+                    AES::AddCtr(ctr, (section.offset + sizeof(ExeFs_Header)) / 16);
+                    AES::AesCtrDecrypt(&buffer[0], section.size,
+                                       AES::ZERO_KEY /*AES::MakeKey(slot, key_y)*/, ctr);
+                }
             }
             return ResultStatus::Success;
         }
@@ -257,6 +274,63 @@ ResultStatus AppLoader_NCCH::LoadExeFS() {
 
     if (file.ReadBytes(&exheader_header, sizeof(ExHeader_Header)) != sizeof(ExHeader_Header))
         return ResultStatus::Error;
+
+    if (exheader_header.arm11_system_local_caps.program_id !=
+        ncch_header.program_id) { // TODO : correct condition
+        LOG_INFO(Loader,
+                 "ExHeader Program ID mismatch: the ROM is probably encrypted. Try to decrypt...");
+        is_crypted = true;
+        crypto7 = ncch_header.flags[3] != 0;
+        crypto9 = ncch_header.flags[7] == 0x20;
+        LOG_INFO(Loader, "crypto7: %s", crypto7 ? "Yes" : "No");
+        LOG_INFO(Loader, "crypto9: %s", crypto9 ? "Yes" : "No");
+        std::copy(ncch_header.signature, ncch_header.signature + 16, key_y.begin());
+        LOG_INFO(Loader, "KeyY = %s", Common::ArrayToString(key_y.data(), 16, 17, false).c_str());
+        if (ncch_header.version == 0 || ncch_header.version == 2) {
+            ctr_exheader.fill(0);
+            std::reverse_copy(ncch_header.partition_id, ncch_header.partition_id + 8,
+                              ctr_exheader.begin());
+            ctr_romfs = ctr_exefs = ctr_exheader;
+            ctr_exheader[8] = 1;
+            ctr_exefs[8] = 2;
+            ctr_romfs[8] = 3;
+        } else if (ncch_header.version == 1) {
+            ctr_exheader.fill(0);
+            std::copy(ncch_header.partition_id, ncch_header.partition_id + 8, ctr_exheader.begin());
+            ctr_romfs = ctr_exefs = ctr_exheader;
+            auto u32ToBEArray = [](u32 value) -> std::array<u8, 4> {
+                return std::array<u8, 4>{(u8)(value >> 24), (u8)((value >> 16) & 0xFF),
+                                         (u8)((value >> 8) & 0xFF), (u8)(value & 0xFF)};
+            };
+            auto offset_exheader = u32ToBEArray(0x200);
+            auto offset_exefs = u32ToBEArray(ncch_header.exefs_offset * kBlockSize);
+            auto offset_romfs = u32ToBEArray(ncch_header.romfs_offset * kBlockSize);
+            std::copy(offset_exheader.begin(), offset_exheader.end(), ctr_exheader.begin() + 12);
+            std::copy(offset_exefs.begin(), offset_exefs.end(), ctr_exefs.begin() + 12);
+            std::copy(offset_romfs.begin(), offset_romfs.end(), ctr_romfs.begin() + 12);
+        } else {
+            LOG_ERROR(Loader, "Unknown NCCH version %d !", ncch_header.version);
+            return ResultStatus::Error;
+        }
+        LOG_INFO(Loader, "ExHeader Counter = %s",
+                 Common::ArrayToString(ctr_exheader.data(), 16, 17, false).c_str());
+        LOG_INFO(Loader, "ExeFS Counter = %s",
+                 Common::ArrayToString(ctr_exefs.data(), 16, 17, false).c_str());
+        LOG_INFO(Loader, "RomFs Counter = %s",
+                 Common::ArrayToString(ctr_romfs.data(), 16, 17, false).c_str());
+
+        // Decrypt ExHeader.
+        // TODO : test this
+        AES::AesCtrDecrypt(&exheader_header, sizeof(ExHeader_Header),
+                           AES::ZERO_KEY /*AES::MakeKey(0x2C, key_y)*/, ctr_exheader);
+
+        if (exheader_header.arm11_system_local_caps.program_id != ncch_header.program_id) {
+            LOG_ERROR(Loader, "Failed to decrypt");
+            return ResultStatus::Error;
+        }
+    } else {
+        is_crypted = false;
+    }
 
     is_compressed = (exheader_header.codeset_info.flags.flag & 1) == 1;
     entry_point = exheader_header.codeset_info.text.address;
@@ -295,6 +369,11 @@ ResultStatus AppLoader_NCCH::LoadExeFS() {
     if (file.ReadBytes(&exefs_header, sizeof(ExeFs_Header)) != sizeof(ExeFs_Header))
         return ResultStatus::Error;
 
+    // Decrypt ExeFS header.
+    if (is_crypted)
+        AES::AesCtrDecrypt(&exefs_header, sizeof(ExeFs_Header),
+                           AES::ZERO_KEY /*AES::MakeKey(0x2C, key_y)*/, ctr_exefs);
+
     is_exefs_loaded = true;
     return ResultStatus::Success;
 }
@@ -313,8 +392,9 @@ ResultStatus AppLoader_NCCH::Load() {
     if (ResultStatus::Success != result)
         return result;
 
-    Service::FS::RegisterArchiveType(std::make_unique<FileSys::ArchiveFactory_RomFS>(*this),
-                                     Service::FS::ArchiveIdCode::RomFS);
+    Service::FS::RegisterArchiveType(
+        std::make_unique<FileSys::ArchiveFactory_RomFS>(*this, GetRomFSAesContext()),
+        Service::FS::ArchiveIdCode::RomFS);
     return ResultStatus::Success;
 }
 
@@ -362,6 +442,15 @@ ResultStatus AppLoader_NCCH::ReadRomFS(std::shared_ptr<FileUtil::IOFile>& romfs_
     }
     LOG_DEBUG(Loader, "NCCH has no RomFS");
     return ResultStatus::ErrorNotUsed;
+}
+
+AES::AesContext AppLoader_NCCH::GetRomFSAesContext() {
+    if (!is_crypted)
+        return AES::AesContext();
+    int slot = crypto7 ? 0x25 : 0x2C;
+    AES::AesContext ac(AES::ZERO_KEY /*AES::MakeKey(slot, key_y)*/, ctr_romfs);
+    AES::AddCtr(ac.ctr, 0x100); // increase counter since ReadRomFS skiped the first 0x1000 byte,
+    return ac;
 }
 
 } // namespace Loader

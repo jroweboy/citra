@@ -680,7 +680,7 @@ PAddr VirtualToPhysicalAddress(const VAddr addr) {
 
     LOG_ERROR(HW_Memory, "Unknown virtual address @ 0x%08X", addr);
     // To help with debugging, set bit on address so that it's obviously invalid.
-    return addr | 0x80000000;
+    return addr; // | 0x80000000;
 }
 
 VAddr PhysicalToVirtualAddress(const PAddr addr) {
@@ -698,7 +698,7 @@ VAddr PhysicalToVirtualAddress(const PAddr addr) {
 
     LOG_ERROR(HW_Memory, "Unknown physical address @ 0x%08X", addr);
     // To help with debugging, set bit on address so that it's obviously invalid.
-    return addr | 0x80000000;
+    return addr; // | 0x80000000;
 }
 
 } // namespace

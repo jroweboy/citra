@@ -5,14 +5,15 @@ set(SRCS
             break_points.cpp
             emu_window.cpp
             file_util.cpp
+            framebuffer_layout.cpp
             hash.cpp
-            key_map.cpp
             logging/filter.cpp
             logging/text_formatter.cpp
             logging/backend.cpp
             memory_util.cpp
             microprofile.cpp
             misc.cpp
+            motion_emu.cpp
             profiler.cpp
             scm_rev.cpp
             string_util.cpp
@@ -35,8 +36,8 @@ set(HEADERS
             common_types.h
             emu_window.h
             file_util.h
+            framebuffer_layout.cpp
             hash.h
-            key_map.h
             linear_disk_cache.h
             logging/text_formatter.h
             logging/filter.h
@@ -46,8 +47,10 @@ set(HEADERS
             memory_util.h
             microprofile.h
             microprofileui.h
+            motion_emu.h
             platform.h
             profiler_reporting.h
+            quaternion.h
             scm_rev.h
             scope_exit.h
             string_util.h
