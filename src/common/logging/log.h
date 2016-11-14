@@ -57,9 +57,11 @@ enum class Class : ClassType {
     Service_BOSS,      ///< The BOSS (SpotPass) service
     Service_GSP,       ///< The GSP (GPU control) service
     Service_AC,        ///< The AC (WiFi status) service
+    Service_ACT,       ///< The ACT (Account) service
     Service_AM,        ///< The AM (Application manager) service
     Service_PTM,       ///< The PTM (Power status & misc.) service
     Service_LDR,       ///< The LDR (3ds dll loader) service
+    Service_MIC,       ///< The MIC (microphone) service
     Service_NDM,       ///< The NDM (Network daemon manager) service
     Service_NIM,       ///< The NIM (Network interface manager) service
     Service_NWM,       ///< The NWM (Network wlan manager) service
@@ -84,6 +86,7 @@ enum class Class : ClassType {
     Audio_DSP,         ///< The HLE implementation of the DSP
     Audio_Sink,        ///< Emulator audio output backend
     Loader,            ///< ROM loader
+    Input,             ///< Input backend
 
     Count ///< Total number of logging classes
 };

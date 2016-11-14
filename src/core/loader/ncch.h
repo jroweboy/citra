@@ -8,6 +8,7 @@
 #include "common/bit_field.h"
 #include "common/common_types.h"
 #include "common/swap.h"
+#include "core/aes/aes.h"
 #include "core/loader/loader.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +158,6 @@ static_assert(sizeof(ExHeader_Header) == 0x800, "ExHeader structure size is wron
 // Loader namespace
 
 namespace Loader {
-
 /// Loads an NCCH file (e.g. from a CCI, or the first NCCH in a CXI)
 class AppLoader_NCCH final : public AppLoader {
 public:
@@ -223,6 +223,12 @@ public:
     ResultStatus ReadRomFS(std::shared_ptr<FileUtil::IOFile>& romfs_file, u64& offset,
                            u64& size) override;
 
+    /**
+     * Get AES context for decrypting RomFS
+     * @return AES::AesContext the AES context
+     */
+    AES::AesContext GetRomFSAesContext();
+
 private:
     /**
      * Reads an application ExeFS section of an NCCH file into AppLoader (e.g. .code, .logo, etc.)
@@ -262,6 +268,11 @@ private:
     ExHeader_Header exheader_header;
 
     std::string filepath;
+
+    std::array<u8, 16> key_y;
+    std::array<u8, 16> ctr_exheader, ctr_exefs, ctr_romfs;
+    bool is_crypted;
+    bool crypto7, crypto9;
 };
 
 } // namespace Loader

@@ -2,6 +2,7 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include "core/hle/kernel/event.h"
 #include "core/hle/service/boss/boss.h"
 #include "core/hle/service/boss/boss_p.h"
 #include "core/hle/service/boss/boss_u.h"
@@ -12,14 +13,14 @@ namespace BOSS {
 
 static u32 new_arrival_flag;
 static u32 ns_data_new_flag;
-static u32 output_flag;
+static u32 optout_flag;
+static Kernel::SharedPtr<Kernel::Event> new_arrival_event;
 
 void InitializeSession(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
     // TODO(JamePeng): Figure out the meaning of these parameters
     u64 unk_param = ((u64)cmd_buff[1] | ((u64)cmd_buff[2] << 32));
     u32 translation = cmd_buff[3];
-    u32 unk_param4 = cmd_buff[4];
 
     if (translation != IPC::CallingPidDesc()) {
         cmd_buff[0] = IPC::MakeHeader(0, 0x1, 0); // 0x40
@@ -33,25 +34,23 @@ void InitializeSession(Service::Interface* self) {
     cmd_buff[0] = IPC::MakeHeader(0x1, 0x1, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
 
-    LOG_WARNING(Service_BOSS, "(STUBBED) unk_param=0x%016X, translation=0x%08X, unk_param4=0x%08X",
-                unk_param, translation, unk_param4);
+    LOG_WARNING(Service_BOSS, "(STUBBED) unk_param=0x%016llX, translation=0x%08X", unk_param,
+                translation);
 }
 
 void RegisterStorage(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
-    // TODO(JamePeng): Figure out the meaning of these parameters
-    u32 unk_param1 = cmd_buff[1];
-    u32 unk_param2 = cmd_buff[2];
-    u32 unk_param3 = cmd_buff[3];
-    u32 unk_flag = cmd_buff[4] & 0xFF;
+
+    u64 extdata_id = ((u64)cmd_buff[1] | ((u64)cmd_buff[2] << 32));
+    u32 boss_size = cmd_buff[3];
+    u32 extdata_type = cmd_buff[4] & 0xFF;
 
     cmd_buff[0] = IPC::MakeHeader(0x2, 0x1, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
 
-    LOG_WARNING(
-        Service_BOSS,
-        "(STUBBED) unk_param1=0x%08X, unk_param2=0x%08X, unk_param3=0x%08X, unk_flag=0x%08X",
-        unk_param1, unk_param2, unk_param3, unk_flag);
+    LOG_WARNING(Service_BOSS,
+                "(STUBBED) extdata_id=0x%08llX, boss_size=0x%08X, extdata_type=0x%08X", extdata_id,
+                boss_size, extdata_type);
 }
 
 void UnregisterStorage(Service::Interface* self) {
@@ -68,7 +67,7 @@ void GetStorageInfo(Service::Interface* self) {
 
     cmd_buff[0] = IPC::MakeHeader(0x4, 0x2, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
-    cmd_buff[2] = 0; // stub 0
+    cmd_buff[2] = 0; // boss_size, stub 0
 
     LOG_WARNING(Service_BOSS, "(STUBBED) called");
 }
@@ -127,26 +126,31 @@ void GetNewArrivalFlag(Service::Interface* self) {
 
 void RegisterNewArrivalEvent(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
-    // TODO(JamePeng): Figure out the meaning of these parameters
-    u32 unk_param1 = cmd_buff[1];
-    u32 unk_param2 = cmd_buff[2];
+
+    u32 copy_handle_desc = cmd_buff[1];
+    u32 event_handle = cmd_buff[2];
+    new_arrival_event = Kernel::g_handle_table.Get<Kernel::Event>(event_handle);
+
+    if (new_arrival_event) {
+        new_arrival_event->name = "BOSS:new_arrival_event";
+    }
 
     cmd_buff[0] = IPC::MakeHeader(0x8, 0x1, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
 
-    LOG_WARNING(Service_BOSS, "(STUBBED) unk_param1=0x%08X, unk_param2=0x%08X", unk_param1,
-                unk_param2);
+    LOG_WARNING(Service_BOSS, "(STUBBED) copy_handle_desc=0x%08X, event_handle=0x%08X",
+                copy_handle_desc, event_handle);
 }
 
 void SetOptoutFlag(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
-    output_flag = cmd_buff[1] & 0xFF;
+    optout_flag = cmd_buff[1] & 0xFF;
 
     cmd_buff[0] = IPC::MakeHeader(0x9, 0x1, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
 
-    LOG_WARNING(Service_BOSS, "output_flag=%u", output_flag);
+    LOG_WARNING(Service_BOSS, "optout_flag=%u", optout_flag);
 }
 
 void GetOptoutFlag(Service::Interface* self) {
@@ -154,9 +158,9 @@ void GetOptoutFlag(Service::Interface* self) {
 
     cmd_buff[0] = IPC::MakeHeader(0xA, 0x2, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
-    cmd_buff[2] = output_flag;
+    cmd_buff[2] = optout_flag;
 
-    LOG_WARNING(Service_BOSS, "output_flag=%u", output_flag);
+    LOG_WARNING(Service_BOSS, "output_flag=%u", optout_flag);
 }
 
 void RegisterTask(Service::Interface* self) {
@@ -979,12 +983,15 @@ void Init() {
     AddService(new BOSS_P_Interface);
     AddService(new BOSS_U_Interface);
 
+    new_arrival_event = nullptr;
     new_arrival_flag = 0;
     ns_data_new_flag = 0;
-    output_flag = 0;
+    optout_flag = 0;
 }
 
-void Shutdown() {}
+void Shutdown() {
+    new_arrival_event = nullptr;
+}
 
 } // namespace BOSS
 

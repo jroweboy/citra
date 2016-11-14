@@ -162,6 +162,10 @@ inline u32* GetCommandBuffer(const int offset = 0) {
                                     offset);
 }
 
+inline static VAddr GetCommandBufferVAddr(const int offset = 0) {
+    return GetCurrentThread()->GetTLSAddress() + kCommandHeaderOffset + offset;
+}
+
 /**
  * Kernel object representing the client endpoint of an IPC session. Sessions are the basic CTR-OS
  * primitive for communication between different processes, and are used to implement service calls

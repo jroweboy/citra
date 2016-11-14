@@ -195,6 +195,19 @@ static void FlushDataCache(Service::Interface* self) {
               process);
 }
 
+static void InvalidateDCache(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+    u32 address = cmd_buff[1];
+    u32 size = cmd_buff[2];
+    u32 process = cmd_buff[4];
+
+    cmd_buff[0] = IPC::MakeHeader(0x13, 1, 0);
+    cmd_buff[1] = RESULT_SUCCESS.raw; // No error
+
+    LOG_TRACE(Service_DSP, "called address=0x%08X, size=0x%X, process=0x%08X", address, size,
+              process);
+}
+
 /**
  * DSP_DSP::RegisterInterruptEvents service function
  *  Inputs:
@@ -303,6 +316,36 @@ static void WriteProcessPipe(Service::Interface* self) {
     std::vector<u8> message(size);
     for (u32 i = 0; i < size; i++) {
         message[i] = Memory::Read8(buffer + i);
+    }
+	
+    switch (pipe) {
+    case DSP::HLE::DspPipe::Audio:
+        ASSERT(message.size() >= 4);
+        message[2] = 0;
+        message[3] = 0;
+        break;
+    case DSP::HLE::DspPipe::Binary:
+        ASSERT(message.size() >= 8);
+        message[4] = 1;
+        message[5] = 0;
+        message[6] = 0;
+        message[7] = 0;
+        break;
+    }
+
+    switch (pipe) {
+    case DSP::HLE::DspPipe::Audio:
+        ASSERT(message.size() >= 4);
+        message[2] = 0;
+        message[3] = 0;
+        break;
+    case DSP::HLE::DspPipe::Binary:
+        ASSERT(message.size() >= 8);
+        message[4] = 1;
+        message[5] = 0;
+        message[6] = 0;
+        message[7] = 0;
+        break;
     }
 
     DSP::HLE::PipeWrite(pipe, message);
@@ -551,7 +594,7 @@ const Interface::FunctionInfo FunctionTable[] = {
     {0x001100C2, LoadComponent, "LoadComponent"},
     {0x00120000, nullptr, "UnloadComponent"},
     {0x00130082, FlushDataCache, "FlushDataCache"},
-    {0x00140082, nullptr, "InvalidateDCache"},
+    {0x00140082, InvalidateDCache, "InvalidateDCache"},
     {0x00150082, RegisterInterruptEvents, "RegisterInterruptEvents"},
     {0x00160000, GetSemaphoreEventHandle, "GetSemaphoreEventHandle"},
     {0x00170040, SetSemaphoreMask, "SetSemaphoreMask"},

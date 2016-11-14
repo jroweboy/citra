@@ -5,33 +5,10 @@
 #include <algorithm>
 #include <cmath>
 #include "common/assert.h"
-#include "common/key_map.h"
+#include "common/profiler_reporting.h"
 #include "emu_window.h"
+#include "input_core/input_core.h"
 #include "video_core/video_core.h"
-
-void EmuWindow::ButtonPressed(Service::HID::PadState pad) {
-    pad_state.hex |= pad.hex;
-}
-
-void EmuWindow::ButtonReleased(Service::HID::PadState pad) {
-    pad_state.hex &= ~pad.hex;
-}
-
-void EmuWindow::CirclePadUpdated(float x, float y) {
-    constexpr int MAX_CIRCLEPAD_POS = 0x9C; // Max value for a circle pad position
-
-    // Make sure the coordinates are in the unit circle,
-    // otherwise normalize it.
-    float r = x * x + y * y;
-    if (r > 1) {
-        r = std::sqrt(r);
-        x /= r;
-        y /= r;
-    }
-
-    circle_pad_x = static_cast<s16>(x * MAX_CIRCLEPAD_POS);
-    circle_pad_y = static_cast<s16>(y * MAX_CIRCLEPAD_POS);
-}
 
 /**
  * Check if the given x/y coordinates are within the touchpad specified by the framebuffer layout
@@ -40,19 +17,20 @@ void EmuWindow::CirclePadUpdated(float x, float y) {
  * @param framebuffer_y Framebuffer y-coordinate to check
  * @return True if the coordinates are within the touchpad, otherwise false
  */
-static bool IsWithinTouchscreen(const EmuWindow::FramebufferLayout& layout, unsigned framebuffer_x,
+static bool IsWithinTouchscreen(const FramebufferLayout& layout, unsigned framebuffer_x,
                                 unsigned framebuffer_y) {
-    return (
-        framebuffer_y >= layout.bottom_screen.top && framebuffer_y < layout.bottom_screen.bottom &&
-        framebuffer_x >= layout.bottom_screen.left && framebuffer_x < layout.bottom_screen.right);
+    return (framebuffer_y >= layout.bottom_screen.top    &&
+            framebuffer_y <  layout.bottom_screen.bottom &&
+            framebuffer_x >= layout.bottom_screen.left   &&
+            framebuffer_x <  layout.bottom_screen.right);
 }
 
-std::tuple<unsigned, unsigned> EmuWindow::ClipToTouchScreen(unsigned new_x, unsigned new_y) {
+std::tuple<unsigned,unsigned> EmuWindow::ClipToTouchScreen(unsigned new_x, unsigned new_y) {
     new_x = std::max(new_x, framebuffer_layout.bottom_screen.left);
-    new_x = std::min(new_x, framebuffer_layout.bottom_screen.right - 1);
+    new_x = std::min(new_x, framebuffer_layout.bottom_screen.right-1);
 
     new_y = std::max(new_y, framebuffer_layout.bottom_screen.top);
-    new_y = std::min(new_y, framebuffer_layout.bottom_screen.bottom - 1);
+    new_y = std::min(new_y, framebuffer_layout.bottom_screen.bottom-1);
 
     return std::make_tuple(new_x, new_y);
 }
@@ -61,22 +39,23 @@ void EmuWindow::TouchPressed(unsigned framebuffer_x, unsigned framebuffer_y) {
     if (!IsWithinTouchscreen(framebuffer_layout, framebuffer_x, framebuffer_y))
         return;
 
-    touch_x = VideoCore::kScreenBottomWidth *
-              (framebuffer_x - framebuffer_layout.bottom_screen.left) /
-              (framebuffer_layout.bottom_screen.right - framebuffer_layout.bottom_screen.left);
-    touch_y = VideoCore::kScreenBottomHeight *
-              (framebuffer_y - framebuffer_layout.bottom_screen.top) /
-              (framebuffer_layout.bottom_screen.bottom - framebuffer_layout.bottom_screen.top);
-
+    int touch_x = VideoCore::kScreenBottomWidth * (framebuffer_x - framebuffer_layout.bottom_screen.left) /
+        (framebuffer_layout.bottom_screen.right - framebuffer_layout.bottom_screen.left);
+    int touch_y = VideoCore::kScreenBottomHeight * (framebuffer_y - framebuffer_layout.bottom_screen.top) /
+        (framebuffer_layout.bottom_screen.bottom - framebuffer_layout.bottom_screen.top);
     touch_pressed = true;
+    InputCore::SetTouchState(std::make_tuple(touch_x, touch_y, true));
+    auto pad_state = InputCore::GetPadState();
     pad_state.touch.Assign(1);
+    InputCore::SetPadState(pad_state);
 }
 
 void EmuWindow::TouchReleased() {
     touch_pressed = false;
-    touch_x = 0;
-    touch_y = 0;
+    InputCore::SetTouchState(std::make_tuple(0, 0, false));
+    auto pad_state = InputCore::GetPadState();
     pad_state.touch.Assign(0);
+    InputCore::SetPadState(pad_state);
 }
 
 void EmuWindow::TouchMoved(unsigned framebuffer_x, unsigned framebuffer_y) {
@@ -87,59 +66,52 @@ void EmuWindow::TouchMoved(unsigned framebuffer_x, unsigned framebuffer_y) {
         std::tie(framebuffer_x, framebuffer_y) = ClipToTouchScreen(framebuffer_x, framebuffer_y);
 
     TouchPressed(framebuffer_x, framebuffer_y);
+	
 }
 
-EmuWindow::FramebufferLayout EmuWindow::FramebufferLayout::DefaultScreenLayout(unsigned width,
-                                                                               unsigned height) {
-    // When hiding the widget, the function receives a size of 0
-    if (width == 0)
-        width = 1;
-    if (height == 0)
-        height = 1;
+void EmuWindow::DepthSliderChanged(float value) {
+    depth_slider = value;
+}
 
-    EmuWindow::FramebufferLayout res = {width, height, {}, {}};
+void EmuWindow::StereoscopicModeChanged(StereoscopicMode mode) {
+    stereoscopic_mode = mode;
+}
 
-    float window_aspect_ratio = static_cast<float>(height) / width;
-    float emulation_aspect_ratio =
-        static_cast<float>(VideoCore::kScreenTopHeight * 2) / VideoCore::kScreenTopWidth;
+void EmuWindow::AccelerometerChanged(float x, float y, float z) {
+    constexpr float coef = 512;
 
-    if (window_aspect_ratio > emulation_aspect_ratio) {
-        // Window is narrower than the emulation content => apply borders to the top and bottom
-        int viewport_height = static_cast<int>(std::round(emulation_aspect_ratio * width));
+    // TODO(wwylele): do a time stretch as it in GyroscopeChanged
+    // The time stretch formula should be like
+    // stretched_vector = (raw_vector - gravity) * stretch_ratio + gravity
+    accel_x = x * coef;
+    accel_y = y * coef;
+    accel_z = z * coef;
+}
 
-        res.top_screen.left = 0;
-        res.top_screen.right = res.top_screen.left + width;
-        res.top_screen.top = (height - viewport_height) / 2;
-        res.top_screen.bottom = res.top_screen.top + viewport_height / 2;
+void EmuWindow::GyroscopeChanged(float x, float y, float z) {
+    constexpr float FULL_FPS = 60;
+    float coef = GetGyroscopeRawToDpsCoefficient();
+    float stretch = FULL_FPS / Common::Profiling::GetTimingResultsAggregator()->GetAggregatedResults().fps;
+    gyro_x = x * coef * stretch;
+    gyro_y = y * coef * stretch;
+    gyro_z = z * coef * stretch;
+}
 
-        int bottom_width = static_cast<int>(
-            (static_cast<float>(VideoCore::kScreenBottomWidth) / VideoCore::kScreenTopWidth) *
-            (res.top_screen.right - res.top_screen.left));
-        int bottom_border = ((res.top_screen.right - res.top_screen.left) - bottom_width) / 2;
-
-        res.bottom_screen.left = bottom_border;
-        res.bottom_screen.right = res.bottom_screen.left + bottom_width;
-        res.bottom_screen.top = res.top_screen.bottom;
-        res.bottom_screen.bottom = res.bottom_screen.top + viewport_height / 2;
-    } else {
-        // Otherwise, apply borders to the left and right sides of the window.
-        int viewport_width = static_cast<int>(std::round(height / emulation_aspect_ratio));
-
-        res.top_screen.left = (width - viewport_width) / 2;
-        res.top_screen.right = res.top_screen.left + viewport_width;
-        res.top_screen.top = 0;
-        res.top_screen.bottom = res.top_screen.top + height / 2;
-
-        int bottom_width = static_cast<int>(
-            (static_cast<float>(VideoCore::kScreenBottomWidth) / VideoCore::kScreenTopWidth) *
-            (res.top_screen.right - res.top_screen.left));
-        int bottom_border = ((res.top_screen.right - res.top_screen.left) - bottom_width) / 2;
-
-        res.bottom_screen.left = res.top_screen.left + bottom_border;
-        res.bottom_screen.right = res.bottom_screen.left + bottom_width;
-        res.bottom_screen.top = res.top_screen.bottom;
-        res.bottom_screen.bottom = res.bottom_screen.top + height / 2;
+void EmuWindow::UpdateCurrentFramebufferLayout(unsigned width, unsigned height) {
+    FramebufferLayout layout;
+    switch (Settings::values.layout_option) {
+    case Settings::LayoutOption::SingleScreen:
+        layout = FramebufferLayout::SingleFrameLayout(width, height);
+        break;
+    case Settings::LayoutOption::LargeScreen:
+        layout = FramebufferLayout::LargeFrameLayout(width, height);
+        break;
+    case Settings::LayoutOption::Default:
+    default:
+        layout = FramebufferLayout::DefaultFrameLayout(width, height);
+        break;
     }
-
-    return res;
+    // Reverse the screens if the setting has changed
+    layout.ReverseFrames(Settings::values.swap_screen);
+    NotifyFramebufferLayoutChanged(layout);
 }

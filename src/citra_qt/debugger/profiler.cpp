@@ -25,6 +25,14 @@ static QVariant GetDataForColumn(int col, const AggregatedDuration& duration) {
         using FloatMs = std::chrono::duration<float, std::chrono::milliseconds::period>;
         return std::chrono::duration_cast<FloatMs>(dur).count();
     };
+	
+    static auto duration_to_fps = [](Duration dur) -> float {
+        using FloatMs = std::chrono::duration<float, std::chrono::milliseconds::period>;
+        if (dur.count() != 0) {
+            return 1000 / std::chrono::duration_cast<FloatMs>(dur).count();
+        }
+        else return 0;
+    };
 
     switch (col) {
     case 1:
@@ -33,6 +41,8 @@ static QVariant GetDataForColumn(int col, const AggregatedDuration& duration) {
         return duration_to_float(duration.min);
     case 3:
         return duration_to_float(duration.max);
+    case 4:
+        return duration_to_fps(duration.avg);
     default:
         return QVariant();
     }
@@ -53,6 +63,8 @@ QVariant ProfilerModel::headerData(int section, Qt::Orientation orientation, int
             return tr("Min");
         case 3:
             return tr("Max");
+        case 4:
+            return tr("FPS(avg)");
         }
     }
 
@@ -68,7 +80,7 @@ QModelIndex ProfilerModel::parent(const QModelIndex& child) const {
 }
 
 int ProfilerModel::columnCount(const QModelIndex& parent) const {
-    return 4;
+    return 5;
 }
 
 int ProfilerModel::rowCount(const QModelIndex& parent) const {
@@ -84,13 +96,13 @@ QVariant ProfilerModel::data(const QModelIndex& index, int role) const {
         if (index.row() == 0) {
             if (index.column() == 0) {
                 return tr("Frame");
-            } else {
+           }else{
                 return GetDataForColumn(index.column(), results.frame_time);
             }
-        } else if (index.row() == 1) {
+        }else if (index.row() == 1) {
             if (index.column() == 0) {
                 return tr("Frame (with swapping)");
-            } else {
+            }else{
                 return GetDataForColumn(index.column(), results.interframe_time);
             }
         }

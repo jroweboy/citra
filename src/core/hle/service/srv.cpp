@@ -7,87 +7,38 @@
 #include "core/hle/kernel/event.h"
 #include "core/hle/service/srv.h"
 
+#include "core/hle/service/service_wrapper.h"
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Namespace SRV
 
 namespace SRV {
 
 static Kernel::SharedPtr<Kernel::Event> event_handle;
-
-/**
- * SRV::RegisterClient service function
- *  Inputs:
- *      0: 0x00010002
- *      1: ProcessId Header (must be 0x20)
- *  Outputs:
- *      0: 0x00010040
- *      1: ResultCode
- */
-static void RegisterClient(Service::Interface* self) {
-    u32* cmd_buff = Kernel::GetCommandBuffer();
-
-    if (cmd_buff[1] != IPC::CallingPidDesc()) {
-        cmd_buff[0] = IPC::MakeHeader(0x0, 0x1, 0); // 0x40
-        cmd_buff[1] = ResultCode(ErrorDescription::OS_InvalidBufferDescriptor, ErrorModule::OS,
-                                 ErrorSummary::WrongArgument, ErrorLevel::Permanent)
-                          .raw;
-        return;
-    }
-    cmd_buff[0] = IPC::MakeHeader(0x1, 0x1, 0); // 0x10040
-    cmd_buff[1] = RESULT_SUCCESS.raw;           // No error
-    LOG_WARNING(Service_SRV, "(STUBBED) called");
+static void Initialize(const IPC::CallingPidParam& pid) {
+    IPC::Return(RESULT_SUCCESS.raw);
 }
 
-/**
- * SRV::EnableNotification service function
- *  Inputs:
- *      0: 0x00020000
- *  Outputs:
- *      0: 0x00020042
- *      1: ResultCode
- *      2: Translation descriptor: 0x20
- *      3: Handle to semaphore signaled on process notification
- */
-static void EnableNotification(Service::Interface* self) {
-    u32* cmd_buff = Kernel::GetCommandBuffer();
+static void GetProcSemaphore() {
 
     // TODO(bunnei): Change to a semaphore once these have been implemented
     event_handle = Kernel::Event::Create(Kernel::ResetType::OneShot, "SRV:Event");
     event_handle->Clear();
-
-    cmd_buff[0] = IPC::MakeHeader(0x2, 0x1, 0x2); // 0x20042
-    cmd_buff[1] = RESULT_SUCCESS.raw;             // No error
-    cmd_buff[2] = IPC::CopyHandleDesc(1);
-    cmd_buff[3] = Kernel::g_handle_table.Create(event_handle).MoveFrom();
-    LOG_WARNING(Service_SRV, "(STUBBED) called");
+    IPC::Return(RESULT_SUCCESS.raw, IPC::HandleParam{false, {Kernel::g_handle_table.Create(event_handle).MoveFrom()}});
 }
 
-/**
- * SRV::GetServiceHandle service function
- *  Inputs:
- *      0: 0x00050100
- *      1-2: 8-byte UTF-8 service name
- *      3: Name length
- *      4: Flags (bit0: if not set, return port-handle if session-handle unavailable)
- *  Outputs:
- *      1: ResultCode
- *      3: Service handle
- */
-static void GetServiceHandle(Service::Interface* self) {
-    ResultCode res = RESULT_SUCCESS;
-    u32* cmd_buff = Kernel::GetCommandBuffer();
-
-    std::string port_name = std::string((const char*)&cmd_buff[1], 0, Service::kMaxPortSize);
+static void GetServiceHandle(const char(& name)[8], u32 name_length, u32 flags) {
+    std::string port_name = std::string(name, 0, name_length);
     auto it = Service::g_srv_services.find(port_name);
 
     if (it != Service::g_srv_services.end()) {
-        cmd_buff[3] = Kernel::g_handle_table.Create(it->second).MoveFrom();
-        LOG_TRACE(Service_SRV, "called port=%s, handle=0x%08X", port_name.c_str(), cmd_buff[3]);
+        auto handle = Kernel::g_handle_table.Create(it->second).MoveFrom();
+        IPC::Return(RESULT_SUCCESS.raw, IPC::HandleParam{false, {handle}});
+        LOG_TRACE(Service_SRV, "called port=%s, handle=0x%08X", port_name.c_str(), handle);
     } else {
         LOG_ERROR(Service_SRV, "(UNIMPLEMENTED) called port=%s", port_name.c_str());
-        res = UnimplementedFunction(ErrorModule::SRV);
+        IPC::Return(UnimplementedFunction(ErrorModule::SRV).raw);
     }
-    cmd_buff[1] = res.raw;
 }
 
 /**
@@ -151,20 +102,15 @@ static void PublishToSubscriber(Service::Interface* self) {
 }
 
 const Interface::FunctionInfo FunctionTable[] = {
-    {0x00010002, RegisterClient, "RegisterClient"},
-    {0x00020000, EnableNotification, "EnableNotification"},
-    {0x00030100, nullptr, "RegisterService"},
-    {0x000400C0, nullptr, "UnregisterService"},
-    {0x00050100, GetServiceHandle, "GetServiceHandle"},
-    {0x000600C2, nullptr, "RegisterPort"},
-    {0x000700C0, nullptr, "UnregisterPort"},
-    {0x00080100, nullptr, "GetPort"},
-    {0x00090040, Subscribe, "Subscribe"},
-    {0x000A0040, Unsubscribe, "Unsubscribe"},
-    {0x000B0000, nullptr, "ReceiveNotification"},
-    {0x000C0080, PublishToSubscriber, "PublishToSubscriber"},
-    {0x000D0040, nullptr, "PublishAndGetSubscriber"},
-    {0x000E00C0, nullptr, "IsServiceRegistered"},
+    {0x00010002, IPC::Wrap<decltype(Initialize)>::F<Initialize>,             "Initialize"},
+    {0x00020000, IPC::Wrap<decltype(GetProcSemaphore)>::F<GetProcSemaphore>, "GetProcSemaphore"},
+    {0x00030100, nullptr,             "RegisterService"},
+    {0x000400C0, nullptr,             "UnregisterService"},
+    {0x00050100, IPC::Wrap<decltype(GetServiceHandle)>::F<GetServiceHandle>, "GetServiceHandle"},
+    {0x000600C2, nullptr,             "RegisterHandle"},
+    {0x00090040, nullptr,             "Subscribe"},
+    {0x000B0000, nullptr,             "ReceiveNotification"},
+    {0x000C0080, nullptr,             "PublishToSubscriber"},
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

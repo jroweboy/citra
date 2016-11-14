@@ -6,8 +6,10 @@
 
 #include <array>
 #include <glad/glad.h>
+#include <thread>
 #include "common/common_types.h"
 #include "common/math_util.h"
+#include "common/profiler_reporting.h"
 #include "core/hw/gpu.h"
 #include "video_core/renderer_base.h"
 #include "video_core/renderer_opengl/gl_resource_manager.h"
@@ -54,15 +56,15 @@ public:
 
 private:
     void InitOpenGLObjects();
-    void ConfigureFramebufferTexture(TextureInfo& texture,
-                                     const GPU::Regs::FramebufferConfig& framebuffer);
+    void ConfigureFramebufferTexture(TextureInfo& texture, const GPU::Regs::FramebufferConfig& framebuffer);
     void DrawScreens();
-    void DrawSingleScreenRotated(const ScreenInfo& screen_info, float x, float y, float w, float h);
+    void DrawSingleScreenRotated(const ScreenInfo& screen_info, float x, float y, float w, float h, bool left, bool right);
     void UpdateFramerate();
+	void FrameLimiter(std::chrono::microseconds average_frame_time, std::chrono::microseconds frame_limit);
 
     // Loads framebuffer from emulated memory into the display information structure
     void LoadFBToScreenInfo(const GPU::Regs::FramebufferConfig& framebuffer,
-                            ScreenInfo& screen_info);
+                            ScreenInfo& screen_info, bool right);
     // Fills active OpenGL texture with the given RGB color.
     void LoadColorToActiveGLTexture(u8 color_r, u8 color_g, u8 color_b, const TextureInfo& texture);
 
@@ -77,10 +79,8 @@ private:
     OGLVertexArray vertex_array;
     OGLBuffer vertex_buffer;
     OGLShader shader;
-
-    /// Display information for top and bottom screens respectively
-    std::array<ScreenInfo, 2> screen_infos;
-
+    /// Display information for top-left, top-right, and bottom screens respectively
+    std::array<ScreenInfo, 3> screen_infos;
     // Shader uniform location indices
     GLuint uniform_modelview_matrix;
     GLuint uniform_color_texture;

@@ -434,6 +434,8 @@ void CheckNew3DSApp(Service::Interface* self);
  */
 void CheckNew3DS(Service::Interface* self);
 
+void Wrap(Service::Interface* self);
+
 /// Initialize the APT service
 void Init();
 
