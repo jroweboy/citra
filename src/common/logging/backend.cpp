@@ -40,9 +40,11 @@ namespace Log {
     SUB(Service, BOSS)                                                                             \
     SUB(Service, GSP)                                                                              \
     SUB(Service, AC)                                                                               \
+    SUB(Service, ACT)                                                                              \
     SUB(Service, AM)                                                                               \
     SUB(Service, PTM)                                                                              \
     SUB(Service, LDR)                                                                              \
+    SUB(Service, MIC)                                                                              \
     SUB(Service, NDM)                                                                              \
     SUB(Service, NIM)                                                                              \
     SUB(Service, NWM)                                                                              \
@@ -66,7 +68,8 @@ namespace Log {
     CLS(Audio)                                                                                     \
     SUB(Audio, DSP)                                                                                \
     SUB(Audio, Sink)                                                                               \
-    CLS(Loader)
+    CLS(Loader)                                                                                    \
+    CLS(Input)
 
 // GetClassName is a macro defined by Windows.h, grrr...
 const char* GetLogClassName(Class log_class) {

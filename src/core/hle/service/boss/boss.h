@@ -15,8 +15,7 @@ namespace BOSS {
  *      0 : Header Code[0x00010082]
  *      1 : u32 lower 64bit value
  *      2 : u32 higher 64bit value
- *      3 : 0x20
- *      4 : u32 unknown value
+ *      3 : 0x20, ARM11-kernel processID translate-header
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
  */
@@ -26,10 +25,9 @@ void InitializeSession(Service::Interface* self);
  * BOSS::RegisterStorage service function
  *  Inputs:
  *      0 : Header Code[0x00020010]
- *      1 : u32 unknown1
- *      2 : u32 unknown2
- *      3 : u32 unknown3
- *      4 : u8 unknown_flag
+ *      1-2 : u64 extdataID
+ *      3 : u32 boss_size
+ *      4 : u8 extdata_type: 0 = shared(NAND), 1 = regular(SD)
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
  */
@@ -50,7 +48,7 @@ void UnregisterStorage(Service::Interface* self);
  *      0 : Header Code[0x00040000]
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
- *      2 : u32 unknown value
+ *      2 : u32 boss_size
  */
 void GetStorageInfo(Service::Interface* self);
 
@@ -101,8 +99,8 @@ void GetNewArrivalFlag(Service::Interface* self);
  * BOSS::RegisterNewArrivalEvent service function
  *  Inputs:
  *      0 : Header Code[0x00080002]
- *      1 : u32 unknown1
- *      2 : u32 unknown2
+ *      1 : u32 copy handle desc
+ *      2 : u32 event handle
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
  */
@@ -112,7 +110,7 @@ void RegisterNewArrivalEvent(Service::Interface* self);
  * BOSS::SetOptoutFlag service function
  *  Inputs:
  *      0 : Header Code[0x00090040]
- *      1 : u8 output_flag
+ *      1 : u8 optout_flag
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
  */

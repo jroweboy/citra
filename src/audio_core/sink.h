@@ -31,6 +31,9 @@ public:
 
     /// Samples enqueued that have not been played yet.
     virtual std::size_t SamplesInQueue() const = 0;
+
+    virtual void SetDevice(int device_id) = 0;
+    virtual std::vector<std::string>* GetDeviceMap() = 0;
 };
 
 } // namespace

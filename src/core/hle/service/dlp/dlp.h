@@ -3,7 +3,12 @@
 // Refer to the license.txt file included.
 
 namespace Service {
+
+class Interface;
+
 namespace DLP {
+
+void IsChild(Interface* self);
 
 /// Initializes the DLP services.
 void Init();

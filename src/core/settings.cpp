@@ -4,8 +4,10 @@
 
 #include "audio_core/audio_core.h"
 #include "core/gdbstub/gdbstub.h"
-#include "settings.h"
+#include "input_core/input_core.h"
 #include "video_core/video_core.h"
+
+#include "common/emu_window.h"
 
 namespace Settings {
 
@@ -19,9 +21,17 @@ void Apply() {
     VideoCore::g_hw_renderer_enabled = values.use_hw_renderer;
     VideoCore::g_shader_jit_enabled = values.use_shader_jit;
     VideoCore::g_scaled_resolution_enabled = values.use_scaled_resolution;
+	VideoCore::g_toggle_framelimit_enabled = values.toggle_framelimit;
+
+    if (VideoCore::g_emu_window) {
+        auto layout = VideoCore::g_emu_window->GetFramebufferLayout();
+        VideoCore::g_emu_window->UpdateCurrentFramebufferLayout(layout.width, layout.height);
+    }
 
     AudioCore::SelectSink(values.sink_id);
     AudioCore::EnableStretching(values.enable_audio_stretching);
+
+    InputCore::ReloadSettings();
 }
 
 } // namespace

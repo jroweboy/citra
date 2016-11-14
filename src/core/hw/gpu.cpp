@@ -9,6 +9,8 @@
 #include "common/common_types.h"
 #include "common/logging/log.h"
 #include "common/microprofile.h"
+#include "common/thread.h"
+#include "common/timer.h"
 #include "common/vector_math.h"
 #include "core/core_timing.h"
 #include "core/hle/service/gsp_gpu.h"
@@ -31,6 +33,10 @@ Regs g_regs;
 
 /// True if the current frame was skipped
 bool g_skip_frame;
+/// Timer for frame pacing
+Common::Timer* timer;
+/// True if we have switched the frame pacing timing during the last frame
+bool switched = false;
 /// 268MHz CPU clocks / 60Hz frames per second
 const u64 frame_ticks = 268123480ull / 60;
 /// Event id for CoreTiming
@@ -269,7 +275,12 @@ static void DisplayTransfer(const Regs::DisplayTransferConfig& config) {
                                  out_coarse_y * out_stride;
                 }
             }
-
+			
+                        if (!dst_pointer) {
+                            LOG_CRITICAL(HW_GPU, "Invalid address %08x", dst_pointer);
+                            break;
+                        }
+						
             const u8* src_pixel = src_pointer + src_offset;
             src_color = DecodePixel(config.input_format, src_pixel);
             if (config.scaling == config.ScaleX) {
@@ -542,11 +553,31 @@ static void VBlankCallback(u64 userdata, int cycles_late) {
     GSP_GPU::SignalInterrupt(GSP_GPU::InterruptId::PDC0);
     GSP_GPU::SignalInterrupt(GSP_GPU::InterruptId::PDC1);
 
-    // Check for user input updates
-    Service::HID::Update();
-
     // Reschedule recurrent event
     CoreTiming::ScheduleEvent(frame_ticks - cycles_late, vblank_event);
+
+    // Frame pacing
+    double diff = timer->GetTimeDifference();
+
+    if (diff < 2 && !switched) {
+        switched = true;
+    } else {
+        int sleepTime;
+
+        if (switched) {
+            sleepTime = (int)(1000.0 / 30.0 - diff);
+        } else {
+            sleepTime = (int)(1000.0 / 60.0 - diff);
+        }
+
+        switched = false;
+
+        if (sleepTime > 0) {
+            Common::SleepCurrentThread(sleepTime);
+        }
+    }
+
+    timer->Update();
 }
 
 /// Initialize hardware
@@ -582,6 +613,7 @@ void Init() {
     last_skip_frame = false;
     g_skip_frame = false;
     frame_count = 0;
+	timer = new Common::Timer();
 
     vblank_event = CoreTiming::RegisterEvent("GPU::VBlankCallback", VBlankCallback);
     CoreTiming::ScheduleEvent(frame_ticks, vblank_event);
