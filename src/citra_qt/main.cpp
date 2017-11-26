@@ -24,6 +24,7 @@
 #include "citra_qt/compatdb.h"
 #include "citra_qt/configuration/config.h"
 #include "citra_qt/configuration/configure_dialog.h"
+#include "citra_qt/crash_dialog/crash_dialog.h"
 #include "citra_qt/debugger/console.h"
 #include "citra_qt/debugger/graphics/graphics.h"
 #include "citra_qt/debugger/graphics/graphics_breakpoints.h"
@@ -750,7 +751,6 @@ void GMainWindow::BootGame(const QString& filename) {
     emu_thread = std::make_unique<EmuThread>(render_window);
     emit EmulationStarting(emu_thread.get());
     render_window->moveContext();
-    emu_thread->start();
 
     connect(render_window, &GRenderWindow::Closed, this, &GMainWindow::OnStopGame);
     connect(emu_thread.get(), &EmuThread::Crashed, this, &GMainWindow::OnCrashed);
@@ -764,6 +764,8 @@ void GMainWindow::BootGame(const QString& filename) {
             &RegistersWidget::OnDebugModeLeft, Qt::BlockingQueuedConnection);
     connect(emu_thread.get(), &EmuThread::DebugModeLeft, waitTreeWidget,
             &WaitTreeWidget::OnDebugModeLeft, Qt::BlockingQueuedConnection);
+
+    emu_thread->start();
 
     // Update the GUI
     registersWidget->OnDebugModeEntered();
@@ -1403,12 +1405,8 @@ void GMainWindow::UpdateStatusBar() {
 }
 
 void GMainWindow::OnCrashed(const Common::CrashInformation& crash_info) {
-    QString message = tr("Citra has crashed. Crash information follows:\n");
-    for (const auto& line : crash_info.stack_trace) {
-        message += QString::fromStdString(line);
-        message += '\n';
-    }
-    QMessageBox::critical(this, tr("Citra"), message);
+    CrashDialog crashDialog(this, crash_info);
+    crashDialog.exec();
     QCoreApplication::exit(EXIT_FAILURE);
 }
 
