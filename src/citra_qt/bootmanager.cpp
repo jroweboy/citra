@@ -3,13 +3,13 @@
 #include <QDir>
 #include <QHBoxLayout>
 #include <QKeyEvent>
-#include <QStandardPaths>
 #include <QScreen>
 #include <QWindow>
 #include <fmt/format.h>
 
 #include "citra_qt/bootmanager.h"
 #include "common/crash_handler.h"
+#include "common/file_util.h"
 #include "common/microprofile.h"
 #include "common/scm_rev.h"
 #include "core/3ds.h"
@@ -21,7 +21,7 @@
 #include "network/network.h"
 
 static std::string GenerateMinidumpFilename() {
-    QString dir = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    QString dir = QString::fromStdString(FileUtil::GetUserPath(D_LOGS_IDX));
     QString file = QDateTime::currentDateTime().toString("'minidump-citra-'yyyyMMdd-HHmmss'.dmp'");
     return QDir::toNativeSeparators(dir + "/" + file).toStdString();
 }
