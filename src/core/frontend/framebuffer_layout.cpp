@@ -17,7 +17,7 @@ static const float BOT_SCREEN_ASPECT_RATIO =
     static_cast<float>(Core::kScreenBottomHeight) / Core::kScreenBottomWidth;
 
 u16 FramebufferLayout::GetScalingRatio() const {
-    return static_cast<u16>(top_screen.GetWidth()) / Core::kScreenTopWidth;
+    return static_cast<u16>(((top_screen.GetWidth() - 1) / Core::kScreenTopWidth) + 1);
 }
 
 // Finds the largest size subrectangle contained in window area that is confined to the aspect ratio

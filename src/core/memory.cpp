@@ -446,6 +446,9 @@ void RasterizerFlushVirtualRegion(VAddr start, u32 size, FlushMode mode) {
             case FlushMode::Flush:
                 rasterizer->FlushRegion(physical_start, overlap_size);
                 break;
+            case FlushMode::Invalidate:
+                rasterizer->InvalidateRegion(physical_start, overlap_size);
+                break;
             case FlushMode::FlushAndInvalidate:
                 rasterizer->FlushAndInvalidateRegion(physical_start, overlap_size);
                 break;
