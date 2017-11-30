@@ -427,14 +427,14 @@ MathUtil::Rectangle<u32> SurfaceParams::GetSubRect(const SurfaceParams& sub_surf
     if (is_tiled) {
         const int x0 = (begin_pixel_index % (stride * 8)) / 8;
         const int y0 = (begin_pixel_index / (stride * 8)) * 8;
-        return MathUtil::Rectangle<u32>(x0, height - y0 - sub_surface.height,
-                                        x0 + sub_surface.width, height - y0); // Bottom to top
+        return MathUtil::Rectangle<u32>(x0, height - y0, x0 + sub_surface.width,
+                                        height - (y0 + sub_surface.height)); // Top to bottom
     }
 
     const int x0 = begin_pixel_index % stride;
     const int y0 = begin_pixel_index / stride;
-    return MathUtil::Rectangle<u32>(x0, y0, x0 + sub_surface.width,
-                                    y0 + sub_surface.height); // Top to bottom
+    return MathUtil::Rectangle<u32>(x0, y0 + sub_surface.height, x0 + sub_surface.width,
+                                    y0); // Bottom to top
 }
 
 MathUtil::Rectangle<u32> SurfaceParams::GetScaledSubRect(const SurfaceParams& sub_surface) const {
