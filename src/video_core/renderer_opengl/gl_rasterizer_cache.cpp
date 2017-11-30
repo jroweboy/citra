@@ -427,14 +427,15 @@ MathUtil::Rectangle<u32> SurfaceParams::GetSubRect(const SurfaceParams& sub_surf
     if (is_tiled) {
         const int x0 = (begin_pixel_index % (stride * 8)) / 8;
         const int y0 = (begin_pixel_index / (stride * 8)) * 8;
+        // Top to bottom
         return MathUtil::Rectangle<u32>(x0, height - y0, x0 + sub_surface.width,
-                                        height - (y0 + sub_surface.height)); // Top to bottom
+                                        height - (y0 + sub_surface.height));
     }
 
     const int x0 = begin_pixel_index % stride;
     const int y0 = begin_pixel_index / stride;
-    return MathUtil::Rectangle<u32>(x0, y0 + sub_surface.height, x0 + sub_surface.width,
-                                    y0); // Bottom to top
+    // Bottom to top
+    return MathUtil::Rectangle<u32>(x0, y0 + sub_surface.height, x0 + sub_surface.width, y0);
 }
 
 MathUtil::Rectangle<u32> SurfaceParams::GetScaledSubRect(const SurfaceParams& sub_surface) const {
@@ -1268,15 +1269,10 @@ void RasterizerCacheOpenGL::ValidateSurface(const Surface& surface, PAddr addr, 
         return;
     }
 
-    auto validate_regions = surface->invalid_regions & validate_interval;
-    auto notify_validated = [&](SurfaceInterval interval) {
-        surface->invalid_regions.erase(interval);
-        validate_regions.erase(interval);
-    };
-
+    surface->invalid_regions &= validate_interval;
     for (;;) {
-        const auto it = validate_regions.begin();
-        if (it == validate_regions.end())
+        const auto it = surface->invalid_regions.begin();
+        if (it == surface->invalid_regions.end())
             break;
 
         const auto interval = *it & validate_interval;
@@ -1289,7 +1285,7 @@ void RasterizerCacheOpenGL::ValidateSurface(const Surface& surface, PAddr addr, 
         if (copy_surface != nullptr) {
             SurfaceInterval copy_interval = params.GetCopyableInterval(copy_surface);
             CopySurface(copy_surface, surface, copy_interval);
-            notify_validated(copy_interval);
+            surface->invalid_regions.erase(interval);
             continue;
         }
 
@@ -1297,7 +1293,7 @@ void RasterizerCacheOpenGL::ValidateSurface(const Surface& surface, PAddr addr, 
         FlushRegion(params.addr, params.size);
         surface->LoadGLBuffer(params.addr, params.end);
         surface->UploadGLTexture(surface->GetSubRect(params));
-        notify_validated(params.GetInterval());
+        surface->invalid_regions.erase(interval);
     }
 }
 
