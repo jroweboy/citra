@@ -7,33 +7,32 @@
 #include "announce_multiplayer_session.h"
 #include "common/announce_multiplayer_room.h"
 #include "common/assert.h"
-#include "core/settings.h"
 #include "network/network.h"
 
 #ifdef ENABLE_WEB_SERVICE
-#include "web_service/announce_room_json.h"
+#include "announce_room_json.h"
 #endif
 
-namespace Core {
+namespace WebService {
 
 // Time between room is announced to web_service
 static constexpr std::chrono::seconds announce_time_interval(15);
 
 AnnounceMultiplayerSession::AnnounceMultiplayerSession() {
 #ifdef ENABLE_WEB_SERVICE
-    backend = std::make_unique<WebService::RoomJson>(
-        Settings::values.announce_multiplayer_room_endpoint_url, Settings::values.citra_username,
-        Settings::values.citra_token);
+    backend = std::make_unique<WebService::RoomJson>();
 #else
     backend = std::make_unique<AnnounceMultiplayerRoom::NullBackend>();
 #endif
 }
 
-void AnnounceMultiplayerSession::Start() {
+void AnnounceMultiplayerSession::Start(const std::string& url, const std::string& username,
+                                       const std::string& token) {
     if (announce_multiplayer_thread) {
         Stop();
     }
     shutdown_event.Reset();
+    backend->SetConnectionInfo(url, username, token);
     announce_multiplayer_thread =
         std::make_unique<std::thread>(&AnnounceMultiplayerSession::AnnounceMultiplayerLoop, this);
 }
@@ -105,4 +104,4 @@ std::future<AnnounceMultiplayerRoom::RoomList> AnnounceMultiplayerSession::GetRo
     return backend->GetRoomList(func);
 }
 
-} // namespace Core
+} // namespace WebService

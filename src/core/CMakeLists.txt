@@ -1,5 +1,4 @@
 set(SRCS
-            announce_multiplayer_session.cpp
             arm/dynarmic/arm_dynarmic.cpp
             arm/dynarmic/arm_dynarmic_cp15.cpp
             arm/dyncom/arm_dyncom.cpp
@@ -193,7 +192,6 @@ set(SRCS
 
 set(HEADERS
             3ds.h
-            announce_multiplayer_session.h
             arm/arm_interface.h
             arm/dynarmic/arm_dynarmic.h
             arm/dynarmic/arm_dynarmic_cp15.h
@@ -402,8 +400,8 @@ set(HEADERS
 
 create_directory_groups(${SRCS} ${HEADERS})
 add_library(core STATIC ${SRCS} ${HEADERS})
-target_link_libraries(core PUBLIC common PRIVATE audio_core network video_core)
+target_link_libraries(core PUBLIC common web_service PRIVATE audio_core network video_core)
 target_link_libraries(core PUBLIC Boost::boost PRIVATE cryptopp dynarmic fmt)
 if (ENABLE_WEB_SERVICE)
-    target_link_libraries(core PUBLIC json-headers web_service)
+    target_link_libraries(core PUBLIC json-headers)
 endif()

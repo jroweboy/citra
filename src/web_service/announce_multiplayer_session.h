@@ -13,7 +13,7 @@
 #include "common/common_types.h"
 #include "common/thread.h"
 
-namespace Core {
+namespace WebService {
 
 /**
  * Instruments AnnounceMultiplayerRoom::Backend.
@@ -42,7 +42,8 @@ public:
     /**
      * Starts the announce of a room to web services
      */
-    void Start();
+    void Start(const std::string& announce_multiplayer_room_endpoint_url,
+               const std::string& username, const std::string& token);
 
     /**
      * Stops the announce to web services
@@ -68,4 +69,4 @@ private:
     void AnnounceMultiplayerLoop();
 };
 
-} // namespace Core
+} // namespace WebService

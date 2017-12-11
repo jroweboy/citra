@@ -76,6 +76,15 @@ public:
                                     const bool has_password, const std::string& preferred_game,
                                     const u64 preferred_game_id) = 0;
     /**
+     * Sets the Login Data for the webservice
+     * @param url The endpoitn url for the web service
+     * @param username The username for the login
+     * @param token The token  for the login
+     */
+    virtual void SetConnectionInfo(const std::string& url, const std::string& username,
+                                   const std::string& token) = 0;
+
+    /**
      * Adds a player information to the data that gets announced
      * @param nickname The nickname of the player
      * @param mac_address The MAC Address of the player
@@ -121,6 +130,8 @@ public:
                             const u16 /*port*/, const u32 /*max_player*/, const u32 /*net_version*/,
                             const bool /*has_password*/, const std::string& /*preferred_game*/,
                             const u64 /*preferred_game_id*/) override {}
+    void SetConnectionInfo(const std::string& /*url*/, const std::string& /*username*/,
+                           const std::string& /*token*/) override {}
     void AddPlayer(const std::string& /*nickname*/, const MacAddress& /*mac_address*/,
                    const u64 /*game_id*/, const std::string& /*game_name*/) override {}
     std::future<Common::WebResult> Announce() override {
