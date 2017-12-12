@@ -404,8 +404,8 @@ set(HEADERS
 
 create_directory_groups(${SRCS} ${HEADERS})
 add_library(core STATIC ${SRCS} ${HEADERS})
-target_link_libraries(core PUBLIC common PRIVATE audio_core network video_core)
+target_link_libraries(core PUBLIC common web_service PRIVATE audio_core network video_core)
 target_link_libraries(core PUBLIC Boost::boost PRIVATE cryptopp dynarmic fmt)
 if (ENABLE_WEB_SERVICE)
-    target_link_libraries(core PUBLIC json-headers web_service)
+    target_link_libraries(core PUBLIC json-headers)
 endif()
