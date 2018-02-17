@@ -572,7 +572,8 @@ static void InitializeWithVersion(Interface* self) {
 
     if (auto room_member = Network::GetRoomMember().lock()) {
         if (room_member->IsConnected()) {
-            SharedPage::SetMacAddress(static_cast<SharedPage::MacAddress>(room_member->GetMacAddress()));
+            SharedPage::SetMacAddress(
+                static_cast<SharedPage::MacAddress>(room_member->GetMacAddress()));
         }
     }
 
