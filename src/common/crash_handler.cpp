@@ -15,8 +15,8 @@
 #include <cstdlib>
 #include <string>
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 #include "common/scope_exit.h"
-#include "common/string_util.h"
 
 namespace Common {
 
@@ -145,9 +145,8 @@ static void GetStackTrace(CONTEXT& ctx) {
         }
 
         // Format string
-        return Common::StringFromFormat("[%llx] %s+0x%llx (%s:%i)", return_address,
-                                        undecorated_name, symbol_displacement, file_name.c_str(),
-                                        line.LineNumber);
+        return fmt::format("[{:x}] {}+0x{:x} ({}:{})", return_address, undecorated_name,
+                           symbol_displacement, file_name.c_str(), line.LineNumber);
     };
 
     // NOTE: SymFunctionTableAccess64 doesn't work with the non-standard stack frames our JIT

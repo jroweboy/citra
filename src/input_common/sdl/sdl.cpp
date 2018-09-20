@@ -287,6 +287,7 @@ void PollLoop() {
 
     SDL_Event event;
     while (initialized) {
+        LOG_CRITICAL(Input, "Test");
         // Wait for 10 ms or until an event happens
         if (SDL_WaitEventTimeout(&event, 10)) {
             // Don't handle the event if we are configuring
@@ -297,6 +298,7 @@ void PollLoop() {
             }
         }
     }
+    LOG_CRITICAL(Input, "DONE");
     CloseSDLJoysticks();
     SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 }

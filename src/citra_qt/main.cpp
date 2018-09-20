@@ -742,6 +742,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
 
 void GMainWindow::BootGame(const QString& filename) {
     LOG_INFO(Frontend, "Citra starting...");
+    ASSERT_MSG(0 == 1, "Forced crash");
     StoreRecentFile(filename); // Put the filename on top of the list
 
     if (!LoadROM(filename))
