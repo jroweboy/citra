@@ -151,8 +151,7 @@ RasterizerOpenGL::RasterizerOpenGL(EmuWindow& window)
     state.Apply();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer.GetHandle());
 
-    shader_program_manager =
-        std::make_unique<ShaderProgramManager>(GLAD_GL_ARB_separate_shader_objects, is_amd);
+    shader_program_manager = std::make_unique<ShaderProgramManager>();
 
     glEnable(GL_BLEND);
 
