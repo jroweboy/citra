@@ -6,13 +6,13 @@
 
 #include <fstream>
 #include "common/common_types.h"
+#include "common/scm_rev.h"
 
-// defined in Version.cpp
-extern const char* scm_rev_git_str;
+namespace Common {
 
 // On disk format:
 // header{
-// u32 'DCAC';
+// u32 'CTRS';
 // u32 version;  // svn_rev
 // u16 sizeof(key_type);
 // u16 sizeof(value_type);
@@ -45,6 +45,12 @@ public:
 template <typename K, typename V>
 class LinearDiskCache {
 public:
+    /**
+     * If this cache isn't versioned, use_version will default the version field in the header to
+     * all zeroes (effectively ignoring it)
+     */
+    explicit LinearDiskCache(bool use_version = true) : m_header(use_version) {}
+
     // return number of read entries
     u32 OpenAndRead(const char* filename, LinearDiskCacheReader<K, V>& reader) {
         using std::ios_base;
@@ -62,49 +68,48 @@ public:
         std::fstream::pos_type start_pos = m_file.tellg();
         std::streamoff file_size = end_pos - start_pos;
 
-        if (m_file.is_open() && ValidateHeader()) {
-            // good header, read some key/value pairs
-            K key;
-
-            V* value = nullptr;
-            u32 value_size;
-            u32 entry_number;
-
-            std::fstream::pos_type last_pos = m_file.tellg();
-
-            while (Read(&value_size)) {
-                std::streamoff next_extent =
-                    (last_pos - start_pos) + sizeof(value_size) + value_size;
-                if (next_extent > file_size)
-                    break;
-
-                delete[] value;
-                value = new V[value_size];
-
-                // read key/value and pass to reader
-                if (Read(&key) && Read(value, value_size) && Read(&entry_number) &&
-                    entry_number == m_num_entries + 1) {
-                    reader.Read(key, value, value_size);
-                } else {
-                    break;
-                }
-
-                m_num_entries++;
-                last_pos = m_file.tellg();
-            }
-            m_file.seekp(last_pos);
-            m_file.clear();
-
-            delete[] value;
-            return m_num_entries;
+        if (!m_file.is_open() || !ValidateHeader()) {
+            // failed to open file for reading or bad header
+            // close and recreate file
+            Close();
+            m_file.open(filename, ios_base::out | ios_base::trunc | ios_base::binary);
+            WriteHeader();
+            return 0;
         }
 
-        // failed to open file for reading or bad header
-        // close and recreate file
-        Close();
-        m_file.open(filename, ios_base::out | ios_base::trunc | ios_base::binary);
-        WriteHeader();
-        return 0;
+        // good header, read some key/value pairs
+        K key;
+
+        V* value = nullptr;
+        u32 value_size;
+        u32 entry_number;
+
+        std::fstream::pos_type last_pos = m_file.tellg();
+
+        while (Read(&value_size)) {
+            std::streamoff next_extent = (last_pos - start_pos) + sizeof(value_size) + value_size;
+            if (next_extent > file_size)
+                break;
+
+            delete[] value;
+            value = new V[value_size];
+
+            // read key/value and pass to reader
+            if (Read(&key) && Read(value, value_size) && Read(&entry_number) &&
+                entry_number == m_num_entries + 1) {
+                reader.Read(key, value, value_size);
+            } else {
+                break;
+            }
+
+            m_num_entries++;
+            last_pos = m_file.tellg();
+        }
+        m_file.seekp(last_pos);
+        m_file.clear();
+
+        delete[] value;
+        return m_num_entries;
     }
 
     void Sync() {
@@ -152,8 +157,13 @@ private:
     }
 
     struct Header {
-        Header() : id(*(u32*)"DCAC"), key_t_size(sizeof(K)), value_t_size(sizeof(V)) {
-            memcpy(ver, scm_rev_git_str, 40);
+        Header(bool use_version)
+            : id(*(u32*)"CTRS"), key_t_size(sizeof(K)), value_t_size(sizeof(V)) {
+            if (use_version) {
+                memcpy(ver, g_shader_cache_version, 40);
+            } else {
+                ver = {0};
+            }
         }
 
         const u32 id;
@@ -165,3 +175,4 @@ private:
     std::fstream m_file;
     u32 m_num_entries;
 };
+} // namespace Common
