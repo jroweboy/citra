@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <array>
 #include <memory>
 #include <glad/glad.h>
 #include "video_core/regs_lighting.h"
@@ -96,10 +97,20 @@ static_assert(
 static_assert(sizeof(GSUniformData) < 16384,
               "GSUniformData structure must be less than 16kb as per the OpenGL spec");
 
+/// Sharable Cache is Regs + ShaderSetup which is everything we need to decompile/generate all of
+/// the different shader configs for this program.
+struct CompleteShaderConfig {
+    Pica::Regs regs;
+    std::array<u32, Pica::Shader::MAX_PROGRAM_CODE_LENGTH> vs_program_code;
+    std::array<u32, Pica::Shader::MAX_SWIZZLE_DATA_LENGTH> vs_swizzle_data;
+    std::array<u32, Pica::Shader::MAX_PROGRAM_CODE_LENGTH> gs_program_code;
+    std::array<u32, Pica::Shader::MAX_SWIZZLE_DATA_LENGTH> gs_swizzle_data;
+};
+
 /// A class that manage different shader stages and configures them with given config data.
 class ShaderProgramManager {
 public:
-    ShaderProgramManager();
+    ShaderProgramManager(bool use_binary_shader_cache);
     ~ShaderProgramManager();
 
     bool UseProgrammableVertexShader(const GLShader::PicaVSConfig& config,
@@ -117,6 +128,10 @@ public:
     void UseFragmentShader(const GLShader::PicaFSConfig& config);
 
     void ApplyTo(OpenGLState& state);
+
+    /// In order to write the shader config to disk, we need references to everything thats needed
+    /// to recreate the program.
+    void UploadCompleteShaderConfig(CompleteShaderConfig);
 
 private:
     class Impl;

@@ -50,7 +50,7 @@ GLuint LoadShader(const char* source, GLenum type) {
     return shader_id;
 }
 
-GLuint LoadProgram(bool separable_program, const std::vector<GLuint>& shaders) {
+GLuint LoadProgram(const std::vector<GLuint>& shaders) {
     // Link the program
     LOG_DEBUG(Render_OpenGL, "Linking program...");
 
@@ -60,10 +60,6 @@ GLuint LoadProgram(bool separable_program, const std::vector<GLuint>& shaders) {
         if (shader != 0) {
             glAttachShader(program_id, shader);
         }
-    }
-
-    if (separable_program) {
-        glProgramParameteri(program_id, GL_PROGRAM_SEPARABLE, GL_TRUE);
     }
 
     glLinkProgram(program_id);
@@ -93,6 +89,40 @@ GLuint LoadProgram(bool separable_program, const std::vector<GLuint>& shaders) {
     }
 
     return program_id;
+}
+
+GLuint LoadBinary(const ProgramBinary& binary) {
+    LOG_DEBUG(Render_OpenGL, "Loading binary program...");
+
+    GLuint program_id = glCreateProgram();
+
+    glProgramBinary(program_id, binary.format, binary.data.data(), binary.data.size());
+
+    // Check the program
+    GLint result = GL_FALSE;
+    glGetProgramiv(program_id, GL_LINK_STATUS, &result);
+
+    if (result != GL_TRUE) {
+        // Failed to load the binary, so delete the program and return 0
+        LOG_DEBUG(
+            Render_OpenGL,
+            "Failed to load shader binary from cache. Falling back to recompiling from source");
+        glDeleteProgram(program_id);
+        return 0;
+    }
+
+    return program_id;
+}
+
+ProgramBinary GetBinary(GLuint program_id) {
+    ProgramBinary binary;
+    // Read the program size and resize the vector appropriately
+    GLsizei size;
+    glGetProgramiv(program_id, GL_PROGRAM_BINARY_LENGTH, &size);
+    binary.data.resize(size);
+    // load the binary into ProgramBinary and return it
+    glGetProgramBinary(program_id, size, nullptr, &binary.format, binary.data.data());
+    return binary;
 }
 
 } // namespace GLShader

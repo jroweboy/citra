@@ -31,6 +31,7 @@
 #define JAP_DIR "JAP"
 
 // Subdirs in the User dir returned by GetUserPath(UserPath::UserDir)
+#define BINARY_CACHE_DIR "binary"
 #define CONFIG_DIR "config"
 #define CACHE_DIR "cache"
 #define SDMC_DIR "sdmc"

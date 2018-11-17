@@ -26,8 +26,8 @@ namespace Pica {
 
 namespace Shader {
 
-constexpr unsigned MAX_PROGRAM_CODE_LENGTH = 4096;
-constexpr unsigned MAX_SWIZZLE_DATA_LENGTH = 4096;
+constexpr unsigned MAX_PROGRAM_CODE_LENGTH = 0x1000;
+constexpr unsigned MAX_SWIZZLE_DATA_LENGTH = 0x1000;
 
 struct AttributeBuffer {
     alignas(16) Math::Vec4<float24> attr[16];

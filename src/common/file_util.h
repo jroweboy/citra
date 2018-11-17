@@ -21,6 +21,7 @@ namespace FileUtil {
 
 // User paths for GetUserPath
 enum class UserPath {
+    BinaryCacheDir,
     CacheDir,
     ConfigDir,
     LogDir,

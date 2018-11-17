@@ -22,6 +22,7 @@ std::atomic<bool> g_hw_shader_enabled;
 std::atomic<bool> g_hw_shader_accurate_gs;
 std::atomic<bool> g_hw_shader_accurate_mul;
 std::atomic<bool> g_renderer_bg_color_update_requested;
+u64 g_program_id;
 
 /// Initialize the video core
 Core::System::ResultStatus Init(EmuWindow& emu_window) {

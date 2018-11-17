@@ -131,11 +131,18 @@ public:
         return *this;
     }
 
-    /// Creates a new program from given shader objects
-    void Create(bool separable_program, const std::vector<GLuint>& shaders) {
+    /// Creates a new program from given program binary
+    void Create(const GLShader::ProgramBinary& binary) {
         if (handle != 0)
             return;
-        handle = GLShader::LoadProgram(separable_program, shaders);
+        handle = GLShader::LoadBinary(binary);
+    }
+
+    /// Creates a new program from given shader objects
+    void Create(const std::vector<GLuint>& shaders) {
+        if (handle != 0)
+            return;
+        handle = GLShader::LoadProgram(shaders);
     }
 
     /// Creates a new program from given shader soruce code
@@ -143,7 +150,7 @@ public:
         OGLShader vert, frag;
         vert.Create(vert_shader, GL_VERTEX_SHADER);
         frag.Create(frag_shader, GL_FRAGMENT_SHADER);
-        Create(false, {vert.handle, frag.handle});
+        Create(std::vector<GLuint>{vert.handle, frag.handle});
     }
 
     /// Deletes the internal OpenGL resource
@@ -153,6 +160,10 @@ public:
         glDeleteProgram(handle);
         OpenGLState::GetCurState().ResetProgram(handle).Apply();
         handle = 0;
+    }
+
+    GLShader::ProgramBinary GetProgramBinary() {
+        return GLShader::GetBinary(handle);
     }
 
     GLuint handle = 0;

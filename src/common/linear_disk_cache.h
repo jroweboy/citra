@@ -5,6 +5,7 @@
 #pragma once
 
 #include <fstream>
+#include <string_view>
 #include "common/common_types.h"
 #include "common/scm_rev.h"
 
@@ -46,13 +47,13 @@ template <typename K, typename V>
 class LinearDiskCache {
 public:
     /**
-     * If this cache isn't versioned, use_version will default the version field in the header to
-     * all zeroes (effectively ignoring it)
+     * If this cache shouldn't need to be recreated, use_version will default the version field in
+     * the header to all zeroes (effectively ignoring it)
      */
     explicit LinearDiskCache(bool use_version = true) : m_header(use_version) {}
 
     // return number of read entries
-    u32 OpenAndRead(const char* filename, LinearDiskCacheReader<K, V>& reader) {
+    u32 OpenAndRead(const std::string& filename, LinearDiskCacheReader<K, V>& reader) {
         using std::ios_base;
 
         // close any currently opened file
@@ -162,7 +163,7 @@ private:
             if (use_version) {
                 memcpy(ver, g_shader_cache_version, 40);
             } else {
-                ver = {0};
+                memset(ver, 0, 40);
             }
         }
 

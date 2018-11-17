@@ -151,7 +151,8 @@ RasterizerOpenGL::RasterizerOpenGL(EmuWindow& window)
     state.Apply();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer.GetHandle());
 
-    shader_program_manager = std::make_unique<ShaderProgramManager>();
+    shader_program_manager =
+        std::make_unique<ShaderProgramManager>(GLAD_GL_ARB_get_program_binary != 0);
 
     glEnable(GL_BLEND);
 
@@ -780,6 +781,11 @@ bool RasterizerOpenGL::Draw(bool accelerate, bool is_indexed) {
     state.scissor.width = draw_rect.GetWidth();
     state.scissor.height = draw_rect.GetHeight();
     state.Apply();
+
+    // Upload the current shader config to the shader program manager for caching purposes
+    shader_program_manager->UploadCompleteShaderConfig(
+        {regs, Pica::g_state.vs.program_code, Pica::g_state.vs.swizzle_data,
+         Pica::g_state.gs.program_code, Pica::g_state.gs.swizzle_data});
 
     // Draw the vertex batch
     bool succeeded = true;

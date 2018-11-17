@@ -690,11 +690,13 @@ const std::string& GetUserPath(UserPath path, const std::string& new_path) {
 
         paths.emplace(UserPath::ConfigDir, user_path + CONFIG_DIR DIR_SEP);
         paths.emplace(UserPath::CacheDir, user_path + CACHE_DIR DIR_SEP);
+        paths.emplace(UserPath::BinaryCacheDir, user_path + BINARY_CACHE_DIR DIR_SEP);
 #else
         if (FileUtil::Exists(ROOT_DIR DIR_SEP USERDATA_DIR)) {
             user_path = ROOT_DIR DIR_SEP USERDATA_DIR DIR_SEP;
             paths.emplace(UserPath::ConfigDir, user_path + CONFIG_DIR DIR_SEP);
             paths.emplace(UserPath::CacheDir, user_path + CACHE_DIR DIR_SEP);
+            paths.emplace(UserPath::BinaryCacheDir, user_path + BINARY_CACHE_DIR DIR_SEP);
         } else {
             std::string data_dir = GetUserDirectory("XDG_DATA_HOME");
             std::string config_dir = GetUserDirectory("XDG_CONFIG_HOME");
@@ -702,7 +704,10 @@ const std::string& GetUserPath(UserPath path, const std::string& new_path) {
 
             user_path = data_dir + DIR_SEP EMU_DATA_DIR DIR_SEP;
             paths.emplace(UserPath::ConfigDir, config_dir + DIR_SEP EMU_DATA_DIR DIR_SEP);
-            paths.emplace(UserPath::CacheDir, cache_dir + DIR_SEP EMU_DATA_DIR DIR_SEP);
+            paths.emplace(UserPath::CacheDir,
+                          cache_dir + DIR_SEP EMU_DATA_DIR DIR_SEP CACHE_DIR DIR_SEP);
+            paths.emplace(UserPath::BinaryCacheDir,
+                          cache_dir + DIR_SEP BINARY_CACHE_DIR DIR_SEP BINARY_CACHE_DIR DIR_SEP);
         }
 #endif
         paths.emplace(UserPath::SDMCDir, user_path + SDMC_DIR DIR_SEP);

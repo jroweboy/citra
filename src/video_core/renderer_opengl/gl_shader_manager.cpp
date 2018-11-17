@@ -3,9 +3,13 @@
 // Refer to the license.txt file included.
 
 #include <algorithm>
+#include <mutex>
+#include <string_view>
 #include <unordered_map>
 #include <boost/functional/hash.hpp>
 #include <boost/variant.hpp>
+#include "common/file_util.h"
+#include "common/linear_disk_cache.h"
 #include "video_core/renderer_opengl/gl_shader_manager.h"
 
 static void SetShaderUniformBlockBinding(GLuint shader, const char* name, UniformBindings binding,
@@ -159,6 +163,40 @@ private:
     std::unordered_map<std::string, OGLShader> shader_cache;
 };
 
+class SharableCacheReader : public Common::LinearDiskCacheReader<u64, u8> {
+    void Read(const u64& key, const u8* value, u32 value_size) override {
+        //
+    }
+};
+
+class BinaryCacheReader : public Common::LinearDiskCacheReader<u64, u8> {
+    void Read(const u64& key, const u8* value, u32 value_size) override {
+        all_keys.push_back(key);
+        if (value_size < sizeof(GLenum)) {
+            failed_to_load.push_back(key);
+            return;
+        }
+        GLShader::ProgramBinary config;
+        memcpy(&config.format, value, sizeof(GLenum));
+        config.data.reserve(value_size - sizeof(GLenum));
+        config.data.insert(config.data.begin(), value + sizeof(GLenum), value + value_size);
+        OGLProgram program;
+        program.Create(config);
+        if (program.handle == 0) {
+            failed_to_load.push_back(key);
+            return;
+        }
+    }
+
+    const std::vector<u32> GetFailed() const {
+        return failed_to_load;
+    }
+
+private:
+    std::vector<u32> failed_to_load;
+    std::vector<u32> all_keys;
+};
+
 using ProgrammableVertexShaders =
     ShaderDoubleCache<GLShader::PicaVSConfig, &GLShader::GenerateVertexShader, GL_VERTEX_SHADER>;
 
@@ -175,9 +213,32 @@ using FragmentShaders =
 
 class ShaderProgramManager::Impl {
 public:
-    Impl()
-        : programmable_vertex_shaders(), trivial_vertex_shader(), programmable_geometry_shaders(),
-          fixed_geometry_shaders(), fragment_shaders() {}
+    explicit Impl(bool use_binary_shader_cache_)
+        : use_binary_shader_cache(use_binary_shader_cache_), programmable_vertex_shaders(),
+          trivial_vertex_shader(), programmable_geometry_shaders(), fixed_geometry_shaders(),
+          fragment_shaders() {
+
+        const u64 program_id = 0;
+        std::string program{fmt::format("{:016X}", program_id)};
+        binary_cache_path = FileUtil::GetUserPath(FileUtil::UserPath::BinaryCacheDir) + program;
+        FileUtil::CreateFullPath(binary_cache_path);
+        // disk_cache_handler = std::thread([&] {
+        if (use_binary_shader_cache) {
+            // First load all of the shaders from the disk cache
+            binary_cache.OpenAndRead(binary_cache_path, binary_reader);
+        }
+
+        // For any shaders that failed to load from the disk cache, recompile what we can find
+        // from the sharable cache.
+        // sharable.OpenAndRead();
+        //});
+    }
+
+    ~Impl() {
+        is_running = false;
+        if (disk_cache_handler.joinable())
+            disk_cache_handler.join();
+    }
 
     struct ShaderTuple {
         GLuint vs = 0;
@@ -203,7 +264,14 @@ public:
         };
     };
 
+    struct ProgramConfig {
+        Pica::Regs regs;
+        std::array<u32, Pica::Shader::MAX_PROGRAM_CODE_LENGTH> program_code;
+        std::array<u32, Pica::Shader::MAX_SWIZZLE_DATA_LENGTH> swizzle_data;
+    };
+
     ShaderTuple current;
+    CompleteShaderConfig current_config;
 
     ProgrammableVertexShaders programmable_vertex_shaders;
     TrivialVertexShader trivial_vertex_shader;
@@ -213,11 +281,22 @@ public:
 
     FragmentShaders fragment_shaders;
 
+    std::atomic<bool> is_running = true;
+    std::mutex cache_mutex;
     std::unordered_map<ShaderTuple, OGLProgram, ShaderTuple::Hash> program_cache;
     OGLPipeline pipeline;
+
+    std::thread disk_cache_handler;
+    bool use_binary_shader_cache;
+
+    std::string binary_cache_path;
+    Common::LinearDiskCache<u64, u8> binary_cache;
+    Common::LinearDiskCache<u64, u8> sharable_cache{false};
+    BinaryCacheReader binary_reader;
 };
 
-ShaderProgramManager::ShaderProgramManager() : impl(std::make_unique<Impl>()) {}
+ShaderProgramManager::ShaderProgramManager(bool use_binary_shader_cache)
+    : impl(std::make_unique<Impl>(use_binary_shader_cache)) {}
 
 ShaderProgramManager::~ShaderProgramManager() = default;
 
@@ -255,12 +334,22 @@ void ShaderProgramManager::UseFragmentShader(const GLShader::PicaFSConfig& confi
     impl->current.fs = impl->fragment_shaders.Get(config);
 }
 
+void ShaderProgramManager::UploadCompleteShaderConfig(CompleteShaderConfig config) {
+    impl->current_config = config;
+}
+
 void ShaderProgramManager::ApplyTo(OpenGLState& state) {
     OGLProgram& cached_program = impl->program_cache[impl->current];
     if (cached_program.handle == 0) {
-        cached_program.Create(false, {impl->current.vs, impl->current.gs, impl->current.fs});
+        cached_program.Create({impl->current.vs, impl->current.gs, impl->current.fs});
         SetShaderUniformBlockBindings(cached_program.handle);
         SetShaderSamplerBindings(cached_program.handle);
+        u64 hash = Common::ComputeStructHash64(impl->current_config);
+        GLShader::ProgramBinary binary = cached_program.GetProgramBinary();
+        // add the format to the front of the data vector so we can just write it all in one go
+        u8* as_u8 = reinterpret_cast<u8*>(&binary.format);
+        binary.data.insert(binary.data.begin(), as_u8, as_u8 + sizeof(binary.format));
+        impl->binary_cache.Append(hash, binary.data.data(), binary.data.size());
     }
     state.draw.shader_program = cached_program.handle;
 }
