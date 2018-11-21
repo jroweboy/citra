@@ -14,6 +14,7 @@
 #include "core/telemetry_session.h"
 
 class EmuWindow;
+class GraphicsContext;
 class ARM_Interface;
 
 namespace AudioCore {

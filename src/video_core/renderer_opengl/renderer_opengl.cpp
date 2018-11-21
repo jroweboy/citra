@@ -497,7 +497,8 @@ static void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum 
 }
 
 /// Initialize the renderer
-Core::System::ResultStatus RendererOpenGL::Init() {
+Core::System::ResultStatus RendererOpenGL::Init(u64 program_id_) {
+    program_id = program_id_;
     render_window.MakeCurrent();
 
     if (GLAD_GL_KHR_debug) {

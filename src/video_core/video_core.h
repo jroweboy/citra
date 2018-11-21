@@ -26,10 +26,9 @@ extern std::atomic<bool> g_hw_shader_enabled;
 extern std::atomic<bool> g_hw_shader_accurate_gs;
 extern std::atomic<bool> g_hw_shader_accurate_mul;
 extern std::atomic<bool> g_renderer_bg_color_update_requested;
-extern u64 g_program_id;
 
 /// Initialize the video core
-Core::System::ResultStatus Init(EmuWindow& emu_window);
+Core::System::ResultStatus Init(EmuWindow& emu_window, u64 program_id);
 
 /// Shutdown the video core
 void Shutdown();

@@ -213,12 +213,11 @@ using FragmentShaders =
 
 class ShaderProgramManager::Impl {
 public:
-    explicit Impl(bool use_binary_shader_cache_)
+    explicit Impl(bool use_binary_shader_cache_, u64 program_id)
         : use_binary_shader_cache(use_binary_shader_cache_), programmable_vertex_shaders(),
           trivial_vertex_shader(), programmable_geometry_shaders(), fixed_geometry_shaders(),
           fragment_shaders() {
 
-        const u64 program_id = 0;
         std::string program{fmt::format("{:016X}", program_id)};
         binary_cache_path = FileUtil::GetUserPath(FileUtil::UserPath::BinaryCacheDir) + program;
         FileUtil::CreateFullPath(binary_cache_path);
@@ -295,8 +294,8 @@ public:
     BinaryCacheReader binary_reader;
 };
 
-ShaderProgramManager::ShaderProgramManager(bool use_binary_shader_cache)
-    : impl(std::make_unique<Impl>(use_binary_shader_cache)) {}
+ShaderProgramManager::ShaderProgramManager(bool use_binary_shader_cache, u64 program_id)
+    : impl(std::make_unique<Impl>(use_binary_shader_cache, program_id)) {}
 
 ShaderProgramManager::~ShaderProgramManager() = default;
 

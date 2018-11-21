@@ -41,7 +41,7 @@ public:
     void SwapBuffers() override;
 
     /// Initialize the renderer
-    Core::System::ResultStatus Init() override;
+    Core::System::ResultStatus Init(u64 program_id) override;
 
     /// Shutdown the renderer
     void ShutDown() override;
@@ -77,4 +77,7 @@ private:
     // Shader attribute input indices
     GLuint attrib_position;
     GLuint attrib_tex_coord;
+
+    // Program ID for the current process
+    u64 program_id = 0;
 };

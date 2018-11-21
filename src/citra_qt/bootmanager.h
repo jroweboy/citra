@@ -7,8 +7,8 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <QGLWidget>
 #include <QThread>
+#include <QWidget>
 #include "common/thread.h"
 #include "core/core.h"
 #include "core/frontend/emu_window.h"
@@ -16,6 +16,8 @@
 class QKeyEvent;
 class QScreen;
 class QTouchEvent;
+class QSurface;
+class QOpenGLContext;
 
 class GGLWidgetInternal;
 class GMainWindow;
@@ -114,6 +116,7 @@ public:
     void MakeCurrent() override;
     void DoneCurrent() override;
     void PollEvents() override;
+    std::unique_ptr<GraphicsContext> CreateSharedContext() const override;
 
     void BackupGeometry();
     void RestoreGeometry();
@@ -164,6 +167,12 @@ private:
     QByteArray geometry;
 
     EmuThread* emu_thread;
+
+    // Context that backs the GGLWidgetInternal (and will be used by core to render)
+    std::unique_ptr<QOpenGLContext> context;
+    // Context that will be shared between all newly created contexts. This should never be made
+    // current
+    std::unique_ptr<QOpenGLContext> shared_context;
 
 protected:
     void showEvent(QShowEvent* event) override;

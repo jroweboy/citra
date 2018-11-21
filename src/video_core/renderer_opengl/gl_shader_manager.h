@@ -110,7 +110,7 @@ struct CompleteShaderConfig {
 /// A class that manage different shader stages and configures them with given config data.
 class ShaderProgramManager {
 public:
-    ShaderProgramManager(bool use_binary_shader_cache);
+    ShaderProgramManager(bool use_binary_shader_cache, u64 program_id);
     ~ShaderProgramManager();
 
     bool UseProgrammableVertexShader(const GLShader::PicaVSConfig& config,

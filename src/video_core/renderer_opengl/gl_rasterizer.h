@@ -35,7 +35,7 @@ class ShaderProgramManager;
 
 class RasterizerOpenGL : public VideoCore::RasterizerInterface {
 public:
-    explicit RasterizerOpenGL(EmuWindow& renderer);
+    explicit RasterizerOpenGL(EmuWindow& renderer, u64 program_id);
     ~RasterizerOpenGL() override;
 
     void AddTriangle(const Pica::Shader::OutputVertex& v0, const Pica::Shader::OutputVertex& v1,

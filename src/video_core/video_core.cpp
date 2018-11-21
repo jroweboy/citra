@@ -25,11 +25,11 @@ std::atomic<bool> g_renderer_bg_color_update_requested;
 u64 g_program_id;
 
 /// Initialize the video core
-Core::System::ResultStatus Init(EmuWindow& emu_window) {
+Core::System::ResultStatus Init(EmuWindow& emu_window, u64 program_id) {
     Pica::Init();
 
     g_renderer = std::make_unique<RendererOpenGL>(emu_window);
-    Core::System::ResultStatus result = g_renderer->Init();
+    Core::System::ResultStatus result = g_renderer->Init(program_id);
 
     if (result != Core::System::ResultStatus::Success) {
         LOG_ERROR(Render, "initialization failed !");
