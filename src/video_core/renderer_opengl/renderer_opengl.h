@@ -41,7 +41,7 @@ public:
     void SwapBuffers() override;
 
     /// Initialize the renderer
-    Core::System::ResultStatus Init(u64 program_id) override;
+    Core::System::ResultStatus Init() override;
 
     /// Shutdown the renderer
     void ShutDown() override;

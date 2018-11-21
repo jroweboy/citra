@@ -139,10 +139,10 @@ public:
     }
 
     /// Creates a new program from given shader objects
-    void Create(const std::vector<GLuint>& shaders) {
+    void Create(bool separable_program, const std::vector<GLuint>& shaders) {
         if (handle != 0)
             return;
-        handle = GLShader::LoadProgram(shaders);
+        handle = GLShader::LoadProgram(separable_program, shaders);
     }
 
     /// Creates a new program from given shader soruce code
@@ -150,7 +150,7 @@ public:
         OGLShader vert, frag;
         vert.Create(vert_shader, GL_VERTEX_SHADER);
         frag.Create(frag_shader, GL_FRAGMENT_SHADER);
-        Create(std::vector<GLuint>{vert.handle, frag.handle});
+        Create(false, std::vector<GLuint>{vert.handle, frag.handle});
     }
 
     /// Deletes the internal OpenGL resource

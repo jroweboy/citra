@@ -28,6 +28,7 @@ Kernel::SharedPtr<Kernel::Process> LaunchTitle(FS::MediaType media_type, u64 tit
         return nullptr;
     }
 
+    Core::System::GetInstance().NotifyProcessChanged();
     return process;
 }
 

@@ -23,7 +23,7 @@ public:
     virtual void SwapBuffers() = 0;
 
     /// Initialize the renderer
-    virtual Core::System::ResultStatus Init(u64 program_id) = 0;
+    virtual Core::System::ResultStatus Init() = 0;
 
     /// Shutdown the renderer
     virtual void ShutDown() = 0;
@@ -60,5 +60,4 @@ protected:
 
 private:
     bool opengl_rasterizer_active = false;
-    u64 program_id;
 };

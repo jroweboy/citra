@@ -89,35 +89,75 @@ void PicaUniformsData::SetFromRegs(const Pica::ShaderRegs& regs,
                    });
 }
 
-class TrivialVertexShader {
+/**
+ * An object representing a shader program staging. It can be either a shader object or a program
+ * object, depending on whether separable program is used.
+ */
+class OGLShaderStage {
 public:
-    explicit TrivialVertexShader() : shader() {
-        shader.Create(GLShader::GenerateTrivialVertexShader().c_str(), GL_VERTEX_SHADER);
+    explicit OGLShaderStage(bool separable) {
+        if (separable) {
+            shader_or_program = OGLProgram();
+        } else {
+            shader_or_program = OGLShader();
+        }
     }
-    GLuint Get() const {
-        return shader.handle;
+
+    void Create(const char* source, GLenum type) {
+        if (shader_or_program.which() == 0) {
+            boost::get<OGLShader>(shader_or_program).Create(source, type);
+        } else {
+            OGLShader shader;
+            shader.Create(source, type);
+            OGLProgram& program = boost::get<OGLProgram>(shader_or_program);
+            program.Create(true, {shader.handle});
+            SetShaderUniformBlockBindings(program.handle);
+            SetShaderSamplerBindings(program.handle);
+        }
+    }
+
+    GLuint GetHandle() const {
+        if (shader_or_program.which() == 0) {
+            return boost::get<OGLShader>(shader_or_program).handle;
+        } else {
+            return boost::get<OGLProgram>(shader_or_program).handle;
+        }
     }
 
 private:
-    OGLShader shader;
+    boost::variant<OGLShader, OGLProgram> shader_or_program;
 };
 
-template <typename KeyConfigType, std::string (*CodeGenerator)(const KeyConfigType&),
+class TrivialVertexShader {
+public:
+    explicit TrivialVertexShader(bool separable) : program(separable) {
+        program.Create(GLShader::GenerateTrivialVertexShader(separable).c_str(), GL_VERTEX_SHADER);
+    }
+    GLuint Get() const {
+        return program.GetHandle();
+    }
+
+private:
+    OGLShaderStage program;
+};
+
+template <typename KeyConfigType, std::string (*CodeGenerator)(const KeyConfigType&, bool),
           GLenum ShaderType>
 class ShaderCache {
 public:
-    ShaderCache() = default;
+    explicit ShaderCache(bool separable) : separable(separable) {}
     GLuint Get(const KeyConfigType& config) {
-        auto [iter, new_shader] = shaders.emplace(config, OGLShader{});
-        OGLShader& cached_shader = iter->second;
+        auto [iter, new_shader] = shaders.emplace(config, OGLShaderStage{separable});
+        OGLShaderStage& cached_shader = iter->second;
         if (new_shader) {
-            cached_shader.Create(CodeGenerator(config).c_str(), ShaderType);
+            cached_shader.Create(CodeGenerator(config, separable).c_str(), ShaderType);
         }
-        return cached_shader.handle;
+        return cached_shader.GetHandle();
     }
 
 private:
-    std::unordered_map<KeyConfigType, OGLShader> shaders;
+    bool separable;
+    std::unordered_map<KeyConfigType, OGLShaderStage> shaders;
 };
 
 // This is a cache designed for shaders translated from PICA shaders. The first cache matches the
@@ -127,40 +167,41 @@ private:
 // different config values from the same shader program.
 template <typename KeyConfigType,
           std::optional<std::string> (*CodeGenerator)(const Pica::Shader::ShaderSetup&,
-                                                      const KeyConfigType&),
+                                                      const KeyConfigType&, bool),
           GLenum ShaderType>
 class ShaderDoubleCache {
 public:
-    ShaderDoubleCache() = default;
+    explicit ShaderDoubleCache(bool separable) : separable(separable) {}
     GLuint Get(const KeyConfigType& key, const Pica::Shader::ShaderSetup& setup) {
         auto map_it = shader_map.find(key);
         if (map_it == shader_map.end()) {
-            auto program_opt = CodeGenerator(setup, key);
+            auto program_opt = CodeGenerator(setup, key, separable);
             if (!program_opt) {
                 shader_map[key] = nullptr;
                 return 0;
             }
 
             std::string& program = *program_opt;
-            auto [iter, new_shader] = shader_cache.emplace(program, OGLShader{});
-            OGLShader& cached_shader = iter->second;
+            auto [iter, new_shader] = shader_cache.emplace(program, OGLShaderStage{separable});
+            OGLShaderStage& cached_shader = iter->second;
             if (new_shader) {
                 cached_shader.Create(program.c_str(), ShaderType);
             }
             shader_map[key] = &cached_shader;
-            return cached_shader.handle;
+            return cached_shader.GetHandle();
         }
 
         if (map_it->second == nullptr) {
             return 0;
         }
 
-        return map_it->second->handle;
+        return map_it->second->GetHandle();
     }
 
 private:
-    std::unordered_map<KeyConfigType, OGLShader*> shader_map;
-    std::unordered_map<std::string, OGLShader> shader_cache;
+    bool separable;
+    std::unordered_map<KeyConfigType, OGLShaderStage*> shader_map;
+    std::unordered_map<std::string, OGLShaderStage> shader_cache;
 };
 
 class SharableCacheReader : public Common::LinearDiskCacheReader<u64, u8> {
@@ -213,11 +254,14 @@ using FragmentShaders =
 
 class ShaderProgramManager::Impl {
 public:
-    explicit Impl(bool use_binary_shader_cache_, u64 program_id)
-        : use_binary_shader_cache(use_binary_shader_cache_), programmable_vertex_shaders(),
-          trivial_vertex_shader(), programmable_geometry_shaders(), fixed_geometry_shaders(),
-          fragment_shaders() {
+    explicit Impl(bool separable, bool is_amd, bool use_binary_shader_cache)
+        : is_amd(is_amd), separable(separable), programmable_vertex_shaders(separable),
+          trivial_vertex_shader(separable), programmable_geometry_shaders(separable),
+          fixed_geometry_shaders(separable), fragment_shaders(separable) {
+        if (separable)
+            pipeline.Create();
 
+        const u64 program_id = 0; // TODO fix this
         std::string program{fmt::format("{:016X}", program_id)};
         binary_cache_path = FileUtil::GetUserPath(FileUtil::UserPath::BinaryCacheDir) + program;
         FileUtil::CreateFullPath(binary_cache_path);
@@ -268,6 +312,7 @@ public:
         std::array<u32, Pica::Shader::MAX_PROGRAM_CODE_LENGTH> program_code;
         std::array<u32, Pica::Shader::MAX_SWIZZLE_DATA_LENGTH> swizzle_data;
     };
+    bool is_amd;
 
     ShaderTuple current;
     CompleteShaderConfig current_config;
@@ -282,6 +327,7 @@ public:
 
     std::atomic<bool> is_running = true;
     std::mutex cache_mutex;
+    bool separable;
     std::unordered_map<ShaderTuple, OGLProgram, ShaderTuple::Hash> program_cache;
     OGLPipeline pipeline;
 
@@ -294,8 +340,9 @@ public:
     BinaryCacheReader binary_reader;
 };
 
-ShaderProgramManager::ShaderProgramManager(bool use_binary_shader_cache, u64 program_id)
-    : impl(std::make_unique<Impl>(use_binary_shader_cache, program_id)) {}
+ShaderProgramManager::ShaderProgramManager(bool separable, bool is_amd,
+                                           bool use_binary_shader_cache)
+    : impl(std::make_unique<Impl>(separable, is_amd, use_binary_shader_cache)) {}
 
 ShaderProgramManager::~ShaderProgramManager() = default;
 
@@ -339,16 +386,38 @@ void ShaderProgramManager::UploadCompleteShaderConfig(CompleteShaderConfig confi
 
 void ShaderProgramManager::ApplyTo(OpenGLState& state) {
     OGLProgram& cached_program = impl->program_cache[impl->current];
-    if (cached_program.handle == 0) {
-        cached_program.Create({impl->current.vs, impl->current.gs, impl->current.fs});
-        SetShaderUniformBlockBindings(cached_program.handle);
-        SetShaderSamplerBindings(cached_program.handle);
-        u64 hash = Common::ComputeStructHash64(impl->current_config);
-        GLShader::ProgramBinary binary = cached_program.GetProgramBinary();
-        // add the format to the front of the data vector so we can just write it all in one go
-        u8* as_u8 = reinterpret_cast<u8*>(&binary.format);
-        binary.data.insert(binary.data.begin(), as_u8, as_u8 + sizeof(binary.format));
-        impl->binary_cache.Append(hash, binary.data.data(), binary.data.size());
+    // if (cached_program.handle == 0) {
+    //    cached_program.Create({impl->current.vs, impl->current.gs, impl->current.fs});
+    //    SetShaderUniformBlockBindings(cached_program.handle);
+    //    SetShaderSamplerBindings(cached_program.handle);
+    //    u64 hash = Common::ComputeStructHash64(impl->current_config);
+    //    GLShader::ProgramBinary binary = cached_program.GetProgramBinary();
+    //    // add the format to the front of the data vector so we can just write it all in one go
+    //    u8* as_u8 = reinterpret_cast<u8*>(&binary.format);
+    //    binary.data.insert(binary.data.begin(), as_u8, as_u8 + sizeof(binary.format));
+    //    impl->binary_cache.Append(hash, binary.data.data(), binary.data.size());
+    if (impl->separable) {
+        if (impl->is_amd) {
+            // Without this reseting, AMD sometimes freezes when one stage is changed but not
+            // for the others. On the other hand, including this reset seems to introduce memory
+            // leak in Intel Graphics.
+            glUseProgramStages(
+                impl->pipeline.handle,
+                GL_VERTEX_SHADER_BIT | GL_GEOMETRY_SHADER_BIT | GL_FRAGMENT_SHADER_BIT, 0);
+        }
+
+        glUseProgramStages(impl->pipeline.handle, GL_VERTEX_SHADER_BIT, impl->current.vs);
+        glUseProgramStages(impl->pipeline.handle, GL_GEOMETRY_SHADER_BIT, impl->current.gs);
+        glUseProgramStages(impl->pipeline.handle, GL_FRAGMENT_SHADER_BIT, impl->current.fs);
+        state.draw.shader_program = 0;
+        state.draw.program_pipeline = impl->pipeline.handle;
+    } else {
+        OGLProgram& cached_program = impl->program_cache[impl->current];
+        if (cached_program.handle == 0) {
+            cached_program.Create(false, {impl->current.vs, impl->current.gs, impl->current.fs});
+            SetShaderUniformBlockBindings(cached_program.handle);
+            SetShaderSamplerBindings(cached_program.handle);
+        }
+        state.draw.shader_program = cached_program.handle;
     }
-    state.draw.shader_program = cached_program.handle;
 }

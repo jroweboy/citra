@@ -40,7 +40,7 @@ static bool IsVendorAmd() {
     return gpu_vendor == "ATI Technologies Inc." || gpu_vendor == "Advanced Micro Devices, Inc.";
 }
 
-RasterizerOpenGL::RasterizerOpenGL(EmuWindow& window, u64 program_id)
+RasterizerOpenGL::RasterizerOpenGL(EmuWindow& window)
     : is_amd(IsVendorAmd()), shader_dirty(true),
       vertex_buffer(GL_ARRAY_BUFFER, VERTEX_BUFFER_SIZE, is_amd),
       uniform_buffer(GL_UNIFORM_BUFFER, UNIFORM_BUFFER_SIZE, false),
@@ -151,8 +151,8 @@ RasterizerOpenGL::RasterizerOpenGL(EmuWindow& window, u64 program_id)
     state.Apply();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer.GetHandle());
 
-    shader_program_manager =
-        std::make_unique<ShaderProgramManager>(GLAD_GL_ARB_get_program_binary != 0, program_id);
+    shader_program_manager = std::make_unique<ShaderProgramManager>(
+        GLAD_GL_ARB_separate_shader_objects, is_amd, GLAD_GL_ARB_get_program_binary != 0);
 
     glEnable(GL_BLEND);
 

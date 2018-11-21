@@ -201,8 +201,7 @@ System::ResultStatus System::Init(EmuWindow& emu_window, u32 system_mode) {
     Service::Init(*this);
     GDBStub::Init();
 
-    ResultStatus result =
-        VideoCore::Init(emu_window, kernel->GetCurrentProcess()->codeset->program_id);
+    ResultStatus result = VideoCore::Init(emu_window);
     if (result != ResultStatus::Success) {
         return result;
     }

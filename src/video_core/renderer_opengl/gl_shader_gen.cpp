@@ -76,10 +76,13 @@ layout (std140) uniform shader_data {
 };
 )";
 
-static std::string GetVertexInterfaceDeclaration(bool is_output) {
+static std::string GetVertexInterfaceDeclaration(bool is_output, bool separable_shader) {
     std::string out;
 
     auto append_variable = [&](const char* var, int location) {
+        if (separable_shader) {
+            out += "layout (location=" + std::to_string(location) + ") ";
+        }
         out += std::string(is_output ? "out " : "in ") + var + ";\n";
     };
 
@@ -90,6 +93,16 @@ static std::string GetVertexInterfaceDeclaration(bool is_output) {
     append_variable("float texcoord0_w", ATTRIBUTE_TEXCOORD0_W);
     append_variable("vec4 normquat", ATTRIBUTE_NORMQUAT);
     append_variable("vec3 view", ATTRIBUTE_VIEW);
+
+    if (is_output && separable_shader) {
+        // gl_PerVertex redeclaration is required for separate shader object
+        out += R"(
+out gl_PerVertex {
+    vec4 gl_Position;
+    float gl_ClipDistance[2];
+};
+)";
+    }
 
     return out;
 }
@@ -1233,7 +1246,7 @@ float ProcTexNoiseCoef(vec2 x) {
     }
 }
 
-std::string GenerateFragmentShader(const PicaFSConfig& config) {
+std::string GenerateFragmentShader(const PicaFSConfig& config, bool separable_shader) {
     const auto& state = config.state;
 
     std::string out = R"(
@@ -1243,7 +1256,11 @@ std::string GenerateFragmentShader(const PicaFSConfig& config) {
 #define ALLOW_SHADOW (defined(GL_ARB_shader_image_load_store) && defined(GL_ARB_shader_image_size))
 )";
 
-    out += GetVertexInterfaceDeclaration(false);
+    if (separable_shader) {
+        out += "#extension GL_ARB_separate_shader_objects : enable\n";
+    }
+
+    out += GetVertexInterfaceDeclaration(false, separable_shader);
 
     out += R"(
 in vec4 gl_FragCoord;
@@ -1573,8 +1590,11 @@ do {
     return out;
 }
 
-std::string GenerateTrivialVertexShader() {
+std::string GenerateTrivialVertexShader(bool separable_shader) {
     std::string out = "#version 330 core\n";
+    if (separable_shader) {
+        out += "#extension GL_ARB_separate_shader_objects : enable\n";
+    }
 
     out += "layout(location = " + std::to_string((int)ATTRIBUTE_POSITION) +
            ") in vec4 vert_position;\n";
@@ -1591,7 +1611,7 @@ std::string GenerateTrivialVertexShader() {
            ") in vec4 vert_normquat;\n";
     out += "layout(location = " + std::to_string((int)ATTRIBUTE_VIEW) + ") in vec3 vert_view;\n";
 
-    out += GetVertexInterfaceDeclaration(true);
+    out += GetVertexInterfaceDeclaration(true, separable_shader);
 
     out += UniformBlockDef;
 
@@ -1615,8 +1635,11 @@ void main() {
 }
 
 std::optional<std::string> GenerateVertexShader(const Pica::Shader::ShaderSetup& setup,
-                                                const PicaVSConfig& config) {
+                                                const PicaVSConfig& config, bool separable_shader) {
     std::string out = "#version 330 core\n";
+    if (separable_shader) {
+        out += "#extension GL_ARB_separate_shader_objects : enable\n";
+    }
 
     out += Pica::Shader::Decompiler::GetCommonDeclarations();
 
@@ -1662,7 +1685,8 @@ layout (std140) uniform vs_config {
 
     // output attributes declaration
     for (u32 i = 0; i < config.state.num_outputs; ++i) {
-        out += " out vec4 vs_out_attr" + std::to_string(i) + ";\n";
+        out += (separable_shader ? "layout(location = " + std::to_string(i) + ")" : std::string{}) +
+               " out vec4 vs_out_attr" + std::to_string(i) + ";\n";
     }
 
     out += "\nvoid main() {\n";
@@ -1676,14 +1700,15 @@ layout (std140) uniform vs_config {
     return out;
 }
 
-static std::string GetGSCommonSource(const PicaGSConfigCommonRaw& config) {
-    std::string out = GetVertexInterfaceDeclaration(true);
+static std::string GetGSCommonSource(const PicaGSConfigCommonRaw& config, bool separable_shader) {
+    std::string out = GetVertexInterfaceDeclaration(true, separable_shader);
     out += UniformBlockDef;
     out += Pica::Shader::Decompiler::GetCommonDeclarations();
 
     out += '\n';
     for (u32 i = 0; i < config.vs_output_attributes; ++i) {
-        out += " in vec4 vs_out_attr" + std::to_string(i) + "[];\n";
+        out += (separable_shader ? "layout(location = " + std::to_string(i) + ")" : std::string{}) +
+               " in vec4 vs_out_attr" + std::to_string(i) + "[];\n";
     }
 
     out += R"(
@@ -1763,8 +1788,11 @@ void EmitPrim(Vertex vtx0, Vertex vtx1, Vertex vtx2) {
     return out;
 };
 
-std::string GenerateFixedGeometryShader(const PicaFixedGSConfig& config) {
+std::string GenerateFixedGeometryShader(const PicaFixedGSConfig& config, bool separable_shader) {
     std::string out = "#version 330 core\n";
+    if (separable_shader) {
+        out += "#extension GL_ARB_separate_shader_objects : enable\n\n";
+    }
 
     out += R"(
 layout(triangles) in;
@@ -1772,7 +1800,7 @@ layout(triangle_strip, max_vertices = 3) out;
 
 )";
 
-    out += GetGSCommonSource(config.state);
+    out += GetGSCommonSource(config.state, separable_shader);
 
     out += R"(
 void main() {
@@ -1794,8 +1822,12 @@ void main() {
 }
 
 std::optional<std::string> GenerateGeometryShader(const Pica::Shader::ShaderSetup& setup,
-                                                  const PicaGSConfig& config) {
+                                                  const PicaGSConfig& config,
+                                                  bool separable_shader) {
     std::string out = "#version 330 core\n";
+    if (separable_shader) {
+        out += "#extension GL_ARB_separate_shader_objects : enable\n";
+    }
 
     if (config.state.num_inputs % config.state.attributes_per_vertex != 0)
         return {};
@@ -1821,7 +1853,7 @@ std::optional<std::string> GenerateGeometryShader(const Pica::Shader::ShaderSetu
     }
     out += "layout(triangle_strip, max_vertices = 30) out;\n\n";
 
-    out += GetGSCommonSource(config.state);
+    out += GetGSCommonSource(config.state, separable_shader);
 
     auto get_input_reg = [&](u32 reg) -> std::string {
         ASSERT(reg < 16);

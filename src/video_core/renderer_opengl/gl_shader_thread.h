@@ -26,9 +26,9 @@ private:
     //
     Common::SPSCQueue<std::packaged_task<GLSLProgram(ShaderProgram)>> decompile_work_queue;
 
-    Common::SPSCQueue<std::packaged_task<GLuint(GLSLProgram)>>
-        // Coordinates and launches the other threads.
-        std::thread main_thread;
+    Common::SPSCQueue<std::packaged_task<u32(GLSLProgram)>> compile_shader_queue;
+    // Coordinates and launches the other threads.
+    std::thread main_thread;
     // Generates GLSL VS + GS source from registers
     std::thread decompile_thread;
     // Has the GraphicsContext current in order to load and compile programs

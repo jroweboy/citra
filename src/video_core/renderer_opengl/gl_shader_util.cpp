@@ -50,7 +50,7 @@ GLuint LoadShader(const char* source, GLenum type) {
     return shader_id;
 }
 
-GLuint LoadProgram(const std::vector<GLuint>& shaders) {
+GLuint LoadProgram(bool separable_program, const std::vector<GLuint>& shaders) {
     // Link the program
     LOG_DEBUG(Render_OpenGL, "Linking program...");
 
@@ -60,6 +60,10 @@ GLuint LoadProgram(const std::vector<GLuint>& shaders) {
         if (shader != 0) {
             glAttachShader(program_id, shader);
         }
+    }
+
+    if (separable_program) {
+        glProgramParameteri(program_id, GL_PROGRAM_SEPARABLE, GL_TRUE);
     }
 
     glLinkProgram(program_id);

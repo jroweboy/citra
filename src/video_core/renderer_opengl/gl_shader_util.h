@@ -26,7 +26,7 @@ GLuint LoadShader(const char* source, GLenum type);
  * @param shaders ID of shaders to attach to the program
  * @returns Handle of the newly created OpenGL program object
  */
-GLuint LoadProgram(const std::vector<GLuint>& shaders);
+GLuint LoadProgram(bool separable_program, const std::vector<GLuint>& shaders);
 
 /**
  * Utility function to create and link an OpenGL GLSL shader program given a binary

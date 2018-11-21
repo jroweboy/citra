@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include "common/common_types.h"
@@ -203,6 +204,16 @@ public:
         return registered_swkbd;
     }
 
+    void AddProcessChangedListener(std::function<void(const System&)> callback) {
+        process_changed_callbacks.push_back(callback);
+    }
+
+    void NotifyProcessChanged() {
+        for (const auto& callback : process_changed_callbacks) {
+            callback(*this);
+        }
+    }
+
 private:
     /**
      * Initialize the emulated system.
@@ -259,6 +270,7 @@ private:
 
     std::atomic<bool> reset_requested;
     std::atomic<bool> shutdown_requested;
+    std::vector<std::function<void(System&)>> process_changed_callbacks;
 };
 
 inline ARM_Interface& CPU() {
