@@ -20,9 +20,12 @@ struct GLSLProgram {
 
 class ShaderCompileThread {
 public:
-    explicit ShaderCompileThread(bool, u64);
+    explicit ShaderCompileThread(bool);
+
+
 
 private:
+    void Init();
     //
     Common::SPSCQueue<std::packaged_task<GLSLProgram(ShaderProgram)>> decompile_work_queue;
 
