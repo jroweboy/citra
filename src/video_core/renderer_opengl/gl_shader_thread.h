@@ -7,11 +7,17 @@
 #include <future>
 #include <string>
 #include <thread>
+#include <glad/glad.h>
 #include "common/common_types.h"
 #include "common/threadsafe_queue.h"
 
-struct ShaderProgram {};
+//
+struct ShaderProgram {
+    // Shader Regs
+    // VS, GS programs
+};
 
+// Decompiled GLSL programs
 struct GLSLProgram {
     std::string vs;
     std::string gs;
@@ -22,7 +28,7 @@ class ShaderCompileThread {
 public:
     explicit ShaderCompileThread(bool);
 
-
+    // GLuint Get(const ShaderProgram&);
 
 private:
     void Init();
