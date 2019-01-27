@@ -141,6 +141,8 @@ add_executable(citra-qt
     updater/updater_p.h
     util/clickable_label.cpp
     util/clickable_label.h
+    util/sbs_dialog.cpp
+    util/sbs_dialog.h
     util/sequence_dialog/sequence_dialog.cpp
     util/sequence_dialog/sequence_dialog.h
     util/spinbox.cpp

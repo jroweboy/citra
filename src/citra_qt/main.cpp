@@ -48,6 +48,7 @@
 #include "citra_qt/uisettings.h"
 #include "citra_qt/updater/updater.h"
 #include "citra_qt/util/clickable_label.h"
+#include "citra_qt/util/sbs_dialog.h"
 #include "common/common_paths.h"
 #include "common/detached_tasks.h"
 #include "common/file_util.h"
@@ -107,7 +108,7 @@ void GMainWindow::ShowTelemetryCallout() {
         tr("<a href='https://citra-emu.org/entry/telemetry-and-why-thats-a-good-thing/'>Anonymous "
            "data is collected</a> to help improve Citra. "
            "<br/><br/>Would you like to share your usage data with us?");
-    if (QMessageBox::question(this, tr("Telemetry"), telemetry_message) != QMessageBox::Yes) {
+    if (MessageBox3D::question(this, tr("Telemetry"), telemetry_message) != MessageBox3D::Yes) {
         Settings::values.enable_telemetry = false;
         Settings::Apply();
     }
@@ -696,19 +697,19 @@ void GMainWindow::ShowUpdatePrompt() {
     defer_update_prompt = false;
 
     auto result =
-        QMessageBox::question(this, tr("Update Available"),
-                              tr("An update is available. Would you like to install it now?"),
-                              QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        MessageBox3D::question(this, tr("Update Available"),
+                               tr("An update is available. Would you like to install it now?"),
+                               MessageBox3D::Yes | MessageBox3D::No, MessageBox3D::Yes);
 
-    if (result == QMessageBox::Yes) {
+    if (result == MessageBox3D::Yes) {
         updater->LaunchUIOnExit();
         close();
     }
 }
 
 void GMainWindow::ShowNoUpdatePrompt() {
-    QMessageBox::information(this, tr("No Update Found"), tr("No update is found."),
-                             QMessageBox::Ok, QMessageBox::Ok);
+    MessageBox3D::information(this, tr("No Update Found"), tr("No update is found."),
+                              MessageBox3D::Ok, MessageBox3D::Ok);
 }
 
 void GMainWindow::OnOpenUpdater() {
@@ -728,7 +729,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
                                           "have the latest graphics driver.");
 
     if (!gladLoadGL()) {
-        QMessageBox::critical(this, below_gl33_title, below_gl33_message);
+        MessageBox3D::critical(this, below_gl33_title, below_gl33_message);
         return false;
     }
 
@@ -740,7 +741,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
         switch (result) {
         case Core::System::ResultStatus::ErrorGetLoader:
             LOG_CRITICAL(Frontend, "Failed to obtain loader for {}!", filename.toStdString());
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("Invalid ROM Format"),
                 tr("Your ROM format is not supported.<br/>Please follow the guides to redump your "
                    "<a href='https://citra-emu.org/wiki/dumping-game-cartridges/'>game "
@@ -751,7 +752,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
 
         case Core::System::ResultStatus::ErrorSystemMode:
             LOG_CRITICAL(Frontend, "Failed to load ROM!");
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("ROM Corrupted"),
                 tr("Your ROM is corrupted. <br/>Please follow the guides to redump your "
                    "<a href='https://citra-emu.org/wiki/dumping-game-cartridges/'>game "
@@ -761,7 +762,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
 
         case Core::System::ResultStatus::ErrorLoader_ErrorEncrypted: {
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("ROM Encrypted"),
                 tr("Your ROM is encrypted. <br/>Please follow the guides to redump your "
                    "<a href='https://citra-emu.org/wiki/dumping-game-cartridges/'>game "
@@ -771,7 +772,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
         }
         case Core::System::ResultStatus::ErrorLoader_ErrorInvalidFormat:
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("Invalid ROM Format"),
                 tr("Your ROM format is not supported.<br/>Please follow the guides to redump your "
                    "<a href='https://citra-emu.org/wiki/dumping-game-cartridges/'>game "
@@ -781,7 +782,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
 
         case Core::System::ResultStatus::ErrorVideoCore:
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("Video Core Error"),
                 tr("An error has occured. Please <a "
                    "href='https://community.citra-emu.org/t/how-to-upload-the-log-file/296'>see "
@@ -791,7 +792,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
 
         case Core::System::ResultStatus::ErrorVideoCore_ErrorGenericDrivers:
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("Video Core Error"),
                 tr("You are running default Windows drivers "
                    "for your GPU. You need to install the "
@@ -799,11 +800,11 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
 
         case Core::System::ResultStatus::ErrorVideoCore_ErrorBelowGL33:
-            QMessageBox::critical(this, below_gl33_title, below_gl33_message);
+            MessageBox3D::critical(this, below_gl33_title, below_gl33_message);
             break;
 
         default:
-            QMessageBox::critical(
+            MessageBox3D::critical(
                 this, tr("Error while loading ROM!"),
                 tr("An unknown error occured. Please see the log for more details."));
             break;
@@ -824,12 +825,12 @@ bool GMainWindow::LoadROM(const QString& filename) {
 
 void GMainWindow::BootGame(const QString& filename) {
     if (filename.endsWith(".cia")) {
-        const auto answer = QMessageBox::question(
+        const auto answer = MessageBox3D::question(
             this, tr("CIA must be installed before usage"),
             tr("Before using this CIA, you must install it. Do you want to install it now?"),
-            QMessageBox::Yes | QMessageBox::No);
+            MessageBox3D::Yes | MessageBox3D::No);
 
-        if (answer == QMessageBox::Yes)
+        if (answer == MessageBox3D::Yes)
             InstallCIA(QStringList(filename));
 
         return;
@@ -1036,7 +1037,7 @@ void GMainWindow::OnGameListOpenFolder(u64 data_id, GameListOpenTarget target) {
 
     QDir dir(qpath);
     if (!dir.exists()) {
-        QMessageBox::critical(
+        MessageBox3D::critical(
             this, tr("Error Opening %1 Folder").arg(QString::fromStdString(open_target)),
             tr("Folder does not exist!"));
         return;
@@ -1074,7 +1075,8 @@ void GMainWindow::OnGameListOpenDirectory(QString directory) {
         path = directory;
     }
     if (!QFileInfo::exists(path)) {
-        QMessageBox::critical(this, tr("Error Opening %1").arg(path), tr("Folder does not exist!"));
+        MessageBox3D::critical(this, tr("Error Opening %1").arg(path),
+                               tr("Folder does not exist!"));
         return;
     }
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
@@ -1159,23 +1161,23 @@ void GMainWindow::OnCIAInstallReport(Service::AM::InstallStatus status, QString 
         this->statusBar()->showMessage(tr("%1 has been installed successfully.").arg(filename));
         break;
     case Service::AM::InstallStatus::ErrorFailedToOpenFile:
-        QMessageBox::critical(this, tr("Unable to open File"),
-                              tr("Could not open %1").arg(filename));
+        MessageBox3D::critical(this, tr("Unable to open File"),
+                               tr("Could not open %1").arg(filename));
         break;
     case Service::AM::InstallStatus::ErrorAborted:
-        QMessageBox::critical(
+        MessageBox3D::critical(
             this, tr("Installation aborted"),
             tr("The installation of %1 was aborted. Please see the log for more details")
                 .arg(filename));
         break;
     case Service::AM::InstallStatus::ErrorInvalid:
-        QMessageBox::critical(this, tr("Invalid File"), tr("%1 is not a valid CIA").arg(filename));
+        MessageBox3D::critical(this, tr("Invalid File"), tr("%1 is not a valid CIA").arg(filename));
         break;
     case Service::AM::InstallStatus::ErrorEncrypted:
-        QMessageBox::critical(this, tr("Encrypted File"),
-                              tr("%1 must be decrypted "
-                                 "before being used with Citra. A real 3DS is required.")
-                                  .arg(filename));
+        MessageBox3D::critical(this, tr("Encrypted File"),
+                               tr("%1 must be decrypted "
+                                  "before being used with Citra. A real 3DS is required.")
+                                   .arg(filename));
         break;
     }
 }
@@ -1197,8 +1199,8 @@ void GMainWindow::OnMenuRecentFile() {
         BootGame(filename);
     } else {
         // Display an error message and remove the file from the list.
-        QMessageBox::information(this, tr("File not found"),
-                                 tr("File \"%1\" not found").arg(filename));
+        MessageBox3D::information(this, tr("File not found"),
+                                  tr("File \"%1\" not found").arg(filename));
 
         UISettings::values.recent_files.removeOne(filename);
         UpdateRecentFiles();
@@ -1250,11 +1252,12 @@ void GMainWindow::OnStopGame() {
 void GMainWindow::OnMenuReportCompatibility() {
     if (!Settings::values.citra_token.empty() && !Settings::values.citra_username.empty()) {
         CompatDB compatdb{this};
+        MoveDialogToLeftEye(&compatdb, this);
         compatdb.exec();
     } else {
-        QMessageBox::critical(this, tr("Missing Citra Account"),
-                              tr("You must link your Citra account to submit test cases."
-                                 "<br/>Go to Emulation &gt; Configure... &gt; Web to do so."));
+        MessageBox3D::critical(this, tr("Missing Citra Account"),
+                               tr("You must link your Citra account to submit test cases."
+                                  "<br/>Go to Emulation &gt; Configure... &gt; Web to do so."));
     }
 }
 
@@ -1365,6 +1368,7 @@ void GMainWindow::OnSwapScreens() {
 
 void GMainWindow::OnCheats() {
     CheatDialog cheat_dialog(this);
+    MoveDialogToLeftEye(&cheat_dialog, this);
     cheat_dialog.exec();
 }
 
@@ -1373,6 +1377,7 @@ void GMainWindow::OnConfigure() {
                                     !multiplayer_state->IsHostingPublicRoom());
     connect(&configureDialog, &ConfigureDialog::LanguageChanged, this,
             &GMainWindow::OnLanguageChanged);
+    MoveDialogToLeftEye(&configureDialog, this);
     auto old_theme = UISettings::values.theme;
     const int old_input_profile_index = Settings::values.current_input_profile_index;
     const auto old_input_profiles = Settings::values.input_profiles;
@@ -1415,8 +1420,8 @@ void GMainWindow::OnLoadAmiibo() {
 
     QFile nfc_file{filename};
     if (!nfc_file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, tr("Error opening Amiibo data file"),
-                             tr("Unable to open Amiibo file \"%1\" for reading.").arg(filename));
+        MessageBox3D::warning(this, tr("Error opening Amiibo data file"),
+                              tr("Unable to open Amiibo file \"%1\" for reading.").arg(filename));
         return;
     }
 
@@ -1424,11 +1429,11 @@ void GMainWindow::OnLoadAmiibo() {
     const u64 read_size =
         nfc_file.read(reinterpret_cast<char*>(&amiibo_data), sizeof(Service::NFC::AmiiboData));
     if (read_size != sizeof(Service::NFC::AmiiboData)) {
-        QMessageBox::warning(this, tr("Error reading Amiibo data file"),
-                             tr("Unable to fully read Amiibo data. Expected to read %1 bytes, but "
-                                "was only able to read %2 bytes.")
-                                 .arg(sizeof(Service::NFC::AmiiboData))
-                                 .arg(read_size));
+        MessageBox3D::warning(this, tr("Error reading Amiibo data file"),
+                              tr("Unable to fully read Amiibo data. Expected to read %1 bytes, but "
+                                 "was only able to read %2 bytes.")
+                                  .arg(sizeof(Service::NFC::AmiiboData))
+                                  .arg(read_size));
         return;
     }
 
@@ -1471,12 +1476,12 @@ void GMainWindow::OnCreateGraphicsSurfaceViewer() {
 
 void GMainWindow::OnRecordMovie() {
     if (emulation_running) {
-        QMessageBox::StandardButton answer = QMessageBox::warning(
+        MessageBox3D::StandardButton answer = MessageBox3D::warning(
             this, tr("Record Movie"),
             tr("To keep consistency with the RNG, it is recommended to record the movie from game "
                "start.<br>Are you sure you still want to record movies now?"),
-            QMessageBox::Yes | QMessageBox::No);
-        if (answer == QMessageBox::No)
+            MessageBox3D::Yes | MessageBox3D::No);
+        if (answer == MessageBox3D::No)
             return;
     }
     const QString path =
@@ -1490,8 +1495,8 @@ void GMainWindow::OnRecordMovie() {
     } else {
         movie_record_on_start = true;
         movie_record_path = path;
-        QMessageBox::information(this, tr("Record Movie"),
-                                 tr("Recording will start once you boot a game."));
+        MessageBox3D::information(this, tr("Record Movie"),
+                                  tr("Recording will start once you boot a game."));
     }
     ui.action_Record_Movie->setEnabled(false);
     ui.action_Play_Movie->setEnabled(false);
@@ -1519,19 +1524,19 @@ bool GMainWindow::ValidateMovie(const QString& path, u64 program_id) {
     int answer;
     switch (result) {
     case Movie::ValidationResult::RevisionDismatch:
-        answer = QMessageBox::question(this, tr("Revision Dismatch"), revision_dismatch_text,
-                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-        if (answer != QMessageBox::Yes)
+        answer = MessageBox3D::question(this, tr("Revision Dismatch"), revision_dismatch_text,
+                                        MessageBox3D::Yes | MessageBox3D::No, MessageBox3D::No);
+        if (answer != MessageBox3D::Yes)
             return false;
         break;
     case Movie::ValidationResult::GameDismatch:
-        answer = QMessageBox::question(this, tr("Game Dismatch"), game_dismatch_text,
-                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-        if (answer != QMessageBox::Yes)
+        answer = MessageBox3D::question(this, tr("Game Dismatch"), game_dismatch_text,
+                                        MessageBox3D::Yes | MessageBox3D::No, MessageBox3D::No);
+        if (answer != MessageBox3D::Yes)
             return false;
         break;
     case Movie::ValidationResult::Invalid:
-        QMessageBox::critical(this, tr("Invalid Movie File"), invalid_movie_text);
+        MessageBox3D::critical(this, tr("Invalid Movie File"), invalid_movie_text);
         return false;
     default:
         break;
@@ -1541,12 +1546,12 @@ bool GMainWindow::ValidateMovie(const QString& path, u64 program_id) {
 
 void GMainWindow::OnPlayMovie() {
     if (emulation_running) {
-        QMessageBox::StandardButton answer = QMessageBox::warning(
+        MessageBox3D::StandardButton answer = MessageBox3D::warning(
             this, tr("Play Movie"),
             tr("To keep consistency with the RNG, it is recommended to play the movie from game "
                "start.<br>Are you sure you still want to play movies now?"),
-            QMessageBox::Yes | QMessageBox::No);
-        if (answer == QMessageBox::No)
+            MessageBox3D::Yes | MessageBox3D::No);
+        if (answer == MessageBox3D::No)
             return;
     }
 
@@ -1568,15 +1573,15 @@ void GMainWindow::OnPlayMovie() {
                "<br/>Please choose a different movie file and try again.");
         u64 program_id = Core::Movie::GetInstance().GetMovieProgramID(path.toStdString());
         if (!program_id) {
-            QMessageBox::critical(this, tr("Invalid Movie File"), invalid_movie_text);
+            MessageBox3D::critical(this, tr("Invalid Movie File"), invalid_movie_text);
             return;
         }
         QString game_path = game_list->FindGameByProgramID(program_id);
         if (game_path.isEmpty()) {
-            QMessageBox::warning(this, tr("Game Not Found"),
-                                 tr("The movie you are trying to play is from a game that is not "
-                                    "in the game list. If you own the game, please add the game "
-                                    "folder to the game list and try to play the movie again."));
+            MessageBox3D::warning(this, tr("Game Not Found"),
+                                  tr("The movie you are trying to play is from a game that is not "
+                                     "in the game list. If you own the game, please add the game "
+                                     "folder to the game list and try to play the movie again."));
             return;
         }
         if (!ValidateMovie(path, program_id))
@@ -1594,15 +1599,15 @@ void GMainWindow::OnPlayMovie() {
 
 void GMainWindow::OnStopRecordingPlayback() {
     if (movie_record_on_start) {
-        QMessageBox::information(this, tr("Record Movie"), tr("Movie recording cancelled."));
+        MessageBox3D::information(this, tr("Record Movie"), tr("Movie recording cancelled."));
         movie_record_on_start = false;
         movie_record_path.clear();
     } else {
         const bool was_recording = Core::Movie::GetInstance().IsRecordingInput();
         Core::Movie::GetInstance().Shutdown();
         if (was_recording) {
-            QMessageBox::information(this, tr("Movie Saved"),
-                                     tr("The movie is successfully saved."));
+            MessageBox3D::information(this, tr("Movie Saved"),
+                                      tr("The movie is successfully saved."));
         }
     }
     ui.action_Record_Movie->setEnabled(true);
@@ -1723,12 +1728,12 @@ void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string det
         status_message = "Fatal Error encountered";
     }
 
-    QMessageBox message_box;
+    MessageBox3D message_box;
     message_box.setWindowTitle(title);
     message_box.setText(message);
-    message_box.setIcon(QMessageBox::Icon::Critical);
-    message_box.addButton(tr("Continue"), QMessageBox::RejectRole);
-    QPushButton* abort_button = message_box.addButton(tr("Abort"), QMessageBox::AcceptRole);
+    message_box.setIcon(MessageBox3D::Icon::Critical);
+    message_box.addButton(tr("Continue"), MessageBox3D::RejectRole);
+    QPushButton* abort_button = message_box.addButton(tr("Abort"), MessageBox3D::AcceptRole);
     if (result != Core::System::ResultStatus::ShutdownRequested)
         message_box.exec();
 
@@ -1749,6 +1754,7 @@ void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string det
 
 void GMainWindow::OnMenuAboutCitra() {
     AboutDialog about{this};
+    MoveDialogToLeftEye(&about, this);
     about.exec();
 }
 
@@ -1756,10 +1762,10 @@ bool GMainWindow::ConfirmClose() {
     if (emu_thread == nullptr || !UISettings::values.confirm_before_closing)
         return true;
 
-    QMessageBox::StandardButton answer =
-        QMessageBox::question(this, tr("Citra"), tr("Would you like to exit now?"),
-                              QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-    return answer != QMessageBox::No;
+    MessageBox3D::StandardButton answer =
+        MessageBox3D::question(this, tr("Citra"), tr("Would you like to exit now?"),
+                               MessageBox3D::Yes | MessageBox3D::No, MessageBox3D::No);
+    return answer != MessageBox3D::No;
 }
 
 void GMainWindow::closeEvent(QCloseEvent* event) {
@@ -1823,10 +1829,10 @@ bool GMainWindow::ConfirmChangeGame() {
     if (emu_thread == nullptr)
         return true;
 
-    auto answer = QMessageBox::question(
+    auto answer = MessageBox3D::question(
         this, tr("Citra"), tr("The game is still running. Would you like to stop emulation?"),
-        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-    return answer != QMessageBox::No;
+        MessageBox3D::Yes | MessageBox3D::No, MessageBox3D::No);
+    return answer != MessageBox3D::No;
 }
 
 void GMainWindow::filterBarSetChecked(bool state) {
@@ -1897,7 +1903,7 @@ void GMainWindow::OnLanguageChanged(const QString& locale) {
 }
 
 void GMainWindow::OnMoviePlaybackCompleted() {
-    QMessageBox::information(this, tr("Playback Completed"), tr("Movie playback completed."));
+    MessageBox3D::information(this, tr("Playback Completed"), tr("Movie playback completed."));
     ui.action_Record_Movie->setEnabled(true);
     ui.action_Play_Movie->setEnabled(true);
     ui.action_Stop_Recording_Playback->setEnabled(false);

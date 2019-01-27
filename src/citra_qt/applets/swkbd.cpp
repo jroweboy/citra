@@ -9,6 +9,7 @@
 #include <QString>
 #include <QVBoxLayout>
 #include "citra_qt/applets/swkbd.h"
+#include "citra_qt/util/sbs_dialog.h"
 
 QtKeyboardValidator::QtKeyboardValidator(QtKeyboard* keyboard_) : keyboard(keyboard_) {}
 
@@ -128,6 +129,7 @@ void QtKeyboard::OpenInputDialog() {
     dialog.setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
                           Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint);
     dialog.setWindowModality(Qt::WindowModal);
+    MoveDialogToLeftEye(&dialog, &parent);
     dialog.exec();
     LOG_INFO(Frontend, "SWKBD input dialog finished, text={}, button={}", dialog.text.toStdString(),
              dialog.button);

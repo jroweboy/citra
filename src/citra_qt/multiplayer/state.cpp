@@ -16,6 +16,7 @@
 #include "citra_qt/multiplayer/state.h"
 #include "citra_qt/uisettings.h"
 #include "citra_qt/util/clickable_label.h"
+#include "citra_qt/util/sbs_dialog.h"
 #include "common/announce_multiplayer_room.h"
 #include "common/logging/log.h"
 
@@ -195,7 +196,8 @@ void MultiplayerState::UpdateThemedIcons() {
         client_room->UpdateIconDisplay();
 }
 
-static void BringWidgetToFront(QWidget* widget) {
+void MultiplayerState::BringWidgetToFront(QWidget* widget) {
+    MoveDialogToLeftEye(widget, parentWidget());
     widget->show();
     widget->activateWindow();
     widget->raise();

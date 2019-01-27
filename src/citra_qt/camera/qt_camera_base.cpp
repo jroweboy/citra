@@ -5,6 +5,7 @@
 #include <QMessageBox>
 #include "citra_qt/camera/camera_util.h"
 #include "citra_qt/camera/qt_camera_base.h"
+#include "citra_qt/util/sbs_dialog.h"
 
 namespace Camera {
 

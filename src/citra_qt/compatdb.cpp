@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QtConcurrent/qtconcurrentrun.h>
 #include "citra_qt/compatdb.h"
+#include "citra_qt/util/sbs_dialog.h"
 #include "common/telemetry.h"
 #include "core/core.h"
 #include "ui_compatdb.h"

@@ -37,6 +37,7 @@ public:
     }
 
     void retranslateUi();
+    void BringWidgetToFront(QWidget* widget);
 
     /**
      * Whether a public room is being hosted or not.
