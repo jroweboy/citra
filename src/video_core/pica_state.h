@@ -8,6 +8,7 @@
 #include "common/bit_field.h"
 #include "common/common_types.h"
 #include "common/vector_math.h"
+#include "video_core/command_processor.h"
 #include "video_core/geometry_pipeline.h"
 #include "video_core/primitive_assembly.h"
 #include "video_core/regs.h"
@@ -128,7 +129,7 @@ struct State {
 
     /// Current Pica command list
     struct {
-        const u32* head_ptr;
+        Pica::CommandProcessor::CommandList head;
         const u32* current_ptr;
         u32 length;
     } cmd_list;

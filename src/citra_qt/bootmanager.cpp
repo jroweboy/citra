@@ -8,6 +8,7 @@
 #include "citra_qt/bootmanager.h"
 #include "common/microprofile.h"
 #include "common/scm_rev.h"
+#include "common/thread.h"
 #include "core/3ds.h"
 #include "core/core.h"
 #include "core/settings.h"
@@ -22,7 +23,11 @@ EmuThread::EmuThread(GRenderWindow* render_window) : render_window(render_window
 EmuThread::~EmuThread() = default;
 
 void EmuThread::run() {
-    render_window->MakeCurrent();
+    Common::SetCurrentThreadName("EmuThread");
+    if (!Settings::values.use_asynchronous_gpu_emulation) {
+        // Single core mode must acquire OpenGL context for entire emulation session
+        render_window->MakeCurrent();
+    }
 
     MicroProfileOnThreadCreate("EmuThread");
 

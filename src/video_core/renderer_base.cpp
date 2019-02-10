@@ -9,6 +9,8 @@
 #include "video_core/swrasterizer/swrasterizer.h"
 #include "video_core/video_core.h"
 
+namespace VideoCore {
+
 RendererBase::RendererBase(Frontend::EmuWindow& window) : render_window{window} {}
 RendererBase::~RendererBase() = default;
 void RendererBase::UpdateCurrentFramebufferLayout() {
@@ -28,3 +30,4 @@ void RendererBase::RefreshRasterizerSetting() {
         }
     }
 }
+} // namespace VideoCore

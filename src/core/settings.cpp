@@ -80,6 +80,7 @@ void LogSettings() {
     LogSetting("Renderer_VsyncEnabled", Settings::values.vsync_enabled);
     LogSetting("Renderer_UseFrameLimit", Settings::values.use_frame_limit);
     LogSetting("Renderer_FrameLimit", Settings::values.frame_limit);
+    LogSetting("Renderer_UseAsyncGPU", Settings::values.use_asynchronous_gpu_emulation);
     LogSetting("Layout_Toggle3d", Settings::values.toggle_3d);
     LogSetting("Layout_Factor3d", Settings::values.factor_3d);
     LogSetting("Layout_LayoutOption", static_cast<int>(Settings::values.layout_option));

@@ -36,7 +36,7 @@ struct ScreenInfo {
     TextureInfo texture;
 };
 
-class RendererOpenGL : public RendererBase {
+class RendererOpenGL : public VideoCore::RendererBase {
 public:
     explicit RendererOpenGL(Frontend::EmuWindow& window);
     ~RendererOpenGL() override;

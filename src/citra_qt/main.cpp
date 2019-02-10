@@ -59,6 +59,7 @@
 #include "core/file_sys/archive_extsavedata.h"
 #include "core/file_sys/archive_source_sd_savedata.h"
 #include "core/frontend/applets/default_applets.h"
+#include "core/frontend/scope_acquire_window_context.h"
 #include "core/gdbstub/gdbstub.h"
 #include "core/hle/service/fs/archive.h"
 #include "core/hle/service/nfc/nfc.h"
@@ -704,15 +705,17 @@ bool GMainWindow::LoadROM(const QString& filename) {
         ShutdownGame();
 
     render_window->InitRenderTarget();
-    render_window->MakeCurrent();
 
     const QString below_gl33_title = tr("OpenGL 3.3 Unsupported");
     const QString below_gl33_message = tr("Your GPU may not support OpenGL 3.3, or you do not "
                                           "have the latest graphics driver.");
 
-    if (!gladLoadGL()) {
-        QMessageBox::critical(this, below_gl33_title, below_gl33_message);
-        return false;
+    {
+        Frontend::ScopeAcquireWindowContext acquire_context{*render_window};
+        if (!gladLoadGL()) {
+            QMessageBox::critical(this, below_gl33_title, below_gl33_message);
+            return false;
+        }
     }
 
     Core::System& system{Core::System::GetInstance()};
@@ -831,7 +834,7 @@ void GMainWindow::BootGame(const QString& filename) {
     // Create and start the emulation thread
     emu_thread = std::make_unique<EmuThread>(render_window);
     emit EmulationStarting(emu_thread.get());
-    render_window->moveContext();
+    //render_window->moveContext();
     emu_thread->start();
 
     connect(render_window, &GRenderWindow::Closed, this, &GMainWindow::OnStopGame);
@@ -1886,6 +1889,7 @@ int main(int argc, char* argv[]) {
     // Init settings params
     QCoreApplication::setOrganizationName("Citra team");
     QCoreApplication::setApplicationName("Citra");
+    QCoreApplication::setAttribute(Qt::AA_DontCheckOpenGLContextThreadAffinity);
 
     QApplication app(argc, argv);
 
