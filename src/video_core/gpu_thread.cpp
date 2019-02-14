@@ -19,19 +19,19 @@ static void ExecuteCommand(CommandData* command, VideoCore::RendererBase& render
         Pica::CommandProcessor::ProcessCommandList(submit_list->head, submit_list->length);
     } else if (const auto data = std::get_if<SwapBuffersCommand>(command)) {
         renderer.SwapBuffers();
-        data->barrier.set_value();
+        data->barrier->set_value();
     } else if (const auto data = std::get_if<MemoryFillCommand>(command)) {
         Pica::CommandProcessor::ProcessMemoryFill(data->config, data->is_second_filler);
     } else if (const auto data = std::get_if<DisplayTransferCommand>(command)) {
         Pica::CommandProcessor::ProcessDisplayTransfer(data->config);
     } else if (const auto data = std::get_if<FlushRegionCommand>(command)) {
         renderer.Rasterizer()->FlushRegion(data->addr, data->size);
-        data->barrier.set_value();
+        data->barrier->set_value();
     } else if (const auto data = std::get_if<InvalidateRegionCommand>(command)) {
         renderer.Rasterizer()->InvalidateRegion(data->addr, data->size);
     } else if (const auto data = std::get_if<FlushAndInvalidateRegionCommand>(command)) {
         renderer.Rasterizer()->FlushAndInvalidateRegion(data->addr, data->size);
-        data->barrier.set_value();
+        data->barrier->set_value();
     } else {
         UNREACHABLE();
     }
@@ -127,10 +127,10 @@ void ThreadManager::SubmitList(const u32* head, u32 length) {
 void ThreadManager::SwapBuffers() {
     std::promise<void> barrier;
     std::future<void> future = barrier.get_future();
-    PushCommand(SwapBuffersCommand{std::ref(barrier)}, &future);
+    PushCommand(SwapBuffersCommand{&barrier}, &future);
 }
 
-void ThreadManager::DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
+void ThreadManager::DisplayTransfer(const GPU::Regs::DisplayTransferConfig* config) {
     PushCommand(DisplayTransferCommand{config});
 }
 
@@ -141,7 +141,7 @@ void ThreadManager::MemoryFill(const GPU::Regs::MemoryFillConfig& config, bool i
 void ThreadManager::FlushRegion(VAddr addr, u64 size) {
     std::promise<void> barrier;
     std::future<void> future = barrier.get_future();
-    PushCommand(FlushRegionCommand(addr, size, std::ref(barrier)), &future);
+    PushCommand(FlushRegionCommand(addr, size, &barrier), &future);
 }
 
 void ThreadManager::InvalidateRegion(VAddr addr, u64 size) {
@@ -151,7 +151,7 @@ void ThreadManager::InvalidateRegion(VAddr addr, u64 size) {
 void ThreadManager::FlushAndInvalidateRegion(VAddr addr, u64 size) {
     std::promise<void> barrier;
     std::future<void> future = barrier.get_future();
-    PushCommand(FlushAndInvalidateRegionCommand(addr, size, std::ref(barrier)), &future);
+    PushCommand(FlushAndInvalidateRegionCommand(addr, size, &barrier), &future);
 }
 
 void ThreadManager::PushCommand(CommandData&& command_data, std::future<void>* wait_for_idle) {

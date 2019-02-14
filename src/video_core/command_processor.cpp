@@ -1045,7 +1045,7 @@ void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
     }
 }
 
-void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
+void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
     MICROPROFILE_SCOPE(GPU_MemoryFill);
     MemoryFill(config);
     // Reset "trigger" flag and set the "finish" flag

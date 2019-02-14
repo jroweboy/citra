@@ -25,78 +25,114 @@ class RendererBase;
 namespace VideoCommon::GPUThread {
 
 /// Command to signal to the GPU thread that a command list is ready for processing
-struct SubmitListCommand final {
-    SubmitListCommand() : head(nullptr), length(0) {}
-    explicit SubmitListCommand(const u32* head, u32 length) : head(head), length(length) {}
-    SubmitListCommand(SubmitListCommand&&) = default;
-    SubmitListCommand& operator=(SubmitListCommand&&) = default;
+struct SubmitListCommand {
+    // SubmitListCommand() : head(nullptr), length(0) {}
+    explicit constexpr SubmitListCommand(const u32* head, u32 length)
+        : head(head), length(length) {}
+    // SubmitListCommand(SubmitListCommand&&) = default;
+    // SubmitListCommand& operator=(SubmitListCommand&&) = default;
+    // SubmitListCommand& operator=(const SubmitListCommand&) = default;
 
     const u32* head;
     u32 length;
 };
 
+static_assert(std::is_copy_assignable<SubmitListCommand>::value,
+              "SubmitListCommand is not copy assignable");
+static_assert(std::is_copy_constructible<SubmitListCommand>::value,
+              "SubmitListCommand is not copy constructable");
+
 /// Command to signal to the GPU thread that a swap buffers is pending
 struct SwapBuffersCommand final {
-    explicit SwapBuffersCommand(std::promise<void>& barrier) : barrier{barrier} {}
-    SwapBuffersCommand(SwapBuffersCommand&&) = default;
-    SwapBuffersCommand& operator=(SwapBuffersCommand&&) = default;
+    explicit constexpr SwapBuffersCommand(std::promise<void>* barrier) : barrier{barrier} {}
+    // SwapBuffersCommand(SwapBuffersCommand&&) = default;
+    // SwapBuffersCommand& operator=(SwapBuffersCommand&&) = default;
 
-    const std::promise<void>& barrier;
+    std::promise<void>* barrier;
 };
 
-struct MemoryFillCommand final {
-    explicit constexpr MemoryFillCommand(const GPU::Regs::MemoryFillConfig& config,
-                                         bool is_second_filler)
-        : config{std::move(config)}, is_second_filler(is_second_filler) {}
-    MemoryFillCommand(MemoryFillCommand&&) = default;
-    MemoryFillCommand& operator=(MemoryFillCommand&&) = default;
+static_assert(std::is_copy_assignable<SwapBuffersCommand>::value,
+              "SwapBuffersCommand is not copy assignable");
+static_assert(std::is_copy_constructible<SwapBuffersCommand>::value,
+              "SwapBuffersCommand is not copy constructable");
 
-    const GPU::Regs::MemoryFillConfig& config;
+struct MemoryFillCommand final {
+    explicit constexpr MemoryFillCommand(const GPU::Regs::MemoryFillConfig* config,
+                                         bool is_second_filler)
+        : config{config}, is_second_filler(is_second_filler) {}
+    // MemoryFillCommand(MemoryFillCommand&&) = default;
+    // MemoryFillCommand& operator=(MemoryFillCommand&&) = default;
+
+    const GPU::Regs::MemoryFillConfig* config;
     bool is_second_filler;
 };
 
-struct DisplayTransferCommand final {
-    explicit constexpr DisplayTransferCommand(const GPU::Regs::DisplayTransferConfig& config)
-        : config{std::move(config)} {}
-    DisplayTransferCommand(DisplayTransferCommand&&) = default;
-    DisplayTransferCommand& operator=(DisplayTransferCommand&&) = default;
+static_assert(std::is_copy_assignable<MemoryFillCommand>::value,
+              "MemoryFillCommand is not copy assignable");
+static_assert(std::is_copy_constructible<MemoryFillCommand>::value,
+              "MemoryFillCommand is not copy constructable");
 
-    const GPU::Regs::DisplayTransferConfig& config;
+struct DisplayTransferCommand final {
+    explicit constexpr DisplayTransferCommand(const GPU::Regs::DisplayTransferConfig* config)
+        : config{config} {}
+    // DisplayTransferCommand(DisplayTransferCommand&&) = default;
+    // DisplayTransferCommand& operator=(DisplayTransferCommand&&) = default;
+
+    const GPU::Regs::DisplayTransferConfig* config;
 };
+static_assert(std::is_copy_assignable<DisplayTransferCommand>::value,
+              "DisplayTransferCommand is not copy assignable");
+static_assert(std::is_copy_constructible<DisplayTransferCommand>::value,
+              "DisplayTransferCommand is not copy constructable");
 
 /// Command to signal to the GPU thread to flush a region
 struct FlushRegionCommand final {
-    explicit FlushRegionCommand(VAddr addr, u64 size, std::promise<void>& barrier)
+    explicit constexpr FlushRegionCommand(VAddr addr, u64 size, std::promise<void>* barrier)
         : addr{addr}, size{size}, barrier{barrier} {}
-    FlushRegionCommand(FlushRegionCommand&&) = default;
-    FlushRegionCommand& operator=(FlushRegionCommand&&) = default;
+    // FlushRegionCommand(FlushRegionCommand&&) = default;
+    // FlushRegionCommand& operator=(FlushRegionCommand&&) = default;
 
     const VAddr addr;
     const u64 size;
-    std::promise<void>& barrier;
+    std::promise<void>* barrier;
 };
+static_assert(std::is_copy_assignable<FlushRegionCommand>::value,
+              "FlushRegionCommand is not copy assignable");
+static_assert(std::is_copy_constructible<FlushRegionCommand>::value,
+              "FlushRegionCommand is not copy constructable");
 
 /// Command to signal to the GPU thread to invalidate a region
 struct InvalidateRegionCommand final {
     explicit constexpr InvalidateRegionCommand(VAddr addr, u64 size) : addr{addr}, size{size} {}
-    InvalidateRegionCommand(InvalidateRegionCommand&&) = default;
-    InvalidateRegionCommand& operator=(InvalidateRegionCommand&&) = default;
+    // InvalidateRegionCommand(InvalidateRegionCommand&&) = default;
+    // InvalidateRegionCommand& operator=(InvalidateRegionCommand&&) = default;
 
+    InvalidateRegionCommand& operator=(InvalidateRegionCommand&&) = default;
+    InvalidateRegionCommand& operator=(const InvalidateRegionCommand&) = default;
     const VAddr addr;
     const u64 size;
 };
+static_assert(std::is_copy_assignable<InvalidateRegionCommand>::value,
+              "InvalidateRegionCommand is not copy assignable");
+static_assert(std::is_copy_constructible<InvalidateRegionCommand>::value,
+              "InvalidateRegionCommand is not copy constructable");
 
 /// Command to signal to the GPU thread to flush and invalidate a region
 struct FlushAndInvalidateRegionCommand final {
-    explicit FlushAndInvalidateRegionCommand(VAddr addr, u64 size, std::promise<void>& barrier)
+    explicit constexpr FlushAndInvalidateRegionCommand(VAddr addr, u64 size,
+                                                       std::promise<void>* barrier)
         : addr{addr}, size{size}, barrier{barrier} {}
-    FlushAndInvalidateRegionCommand(FlushAndInvalidateRegionCommand&&) = default;
-    FlushAndInvalidateRegionCommand& operator=(FlushAndInvalidateRegionCommand&&) = default;
+    // FlushAndInvalidateRegionCommand(FlushAndInvalidateRegionCommand&&) = default;
+    // FlushAndInvalidateRegionCommand& operator=(FlushAndInvalidateRegionCommand&&) = default;
 
-    const VAddr addr;
+    VAddr addr;
     const u64 size;
-    std::promise<void>& barrier;
+    std::promise<void>* barrier;
 };
+static_assert(std::is_copy_assignable<FlushAndInvalidateRegionCommand>::value,
+              "FlushAndInvalidateRegionCommand is not copy assignable");
+static_assert(std::is_copy_constructible<FlushAndInvalidateRegionCommand>::value,
+              "FlushAndInvalidateRegionCommand is not copy constructable");
 
 using CommandData =
     std::variant<SubmitListCommand, SwapBuffersCommand, MemoryFillCommand, DisplayTransferCommand,
