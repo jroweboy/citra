@@ -66,28 +66,23 @@ inline void Write(u32 addr, const T data) {
     case GPU_REG_INDEX_WORKAROUND(memory_fill_config[0].trigger, 0x00004 + 0x3):
     case GPU_REG_INDEX_WORKAROUND(memory_fill_config[1].trigger, 0x00008 + 0x3): {
         const bool is_second_filler = (index != GPU_REG_INDEX(memory_fill_config[0].trigger));
-        const auto& temp = g_regs.memory_fill_config[is_second_filler];
-        Regs::MemoryFillConfig config;
-        std::memcpy(&config, &temp, sizeof(Regs::MemoryFillConfig));
+        const auto& config = g_regs.memory_fill_config[is_second_filler];
 
         if (config.trigger) {
             LOG_TRACE(HW_GPU, "MemoryFill started from {:#010X} to {:#010X}",
                       config.GetStartAddress(), config.GetEndAddress());
-            VideoCore::MemoryFill(std::move(config), is_second_filler);
+            VideoCore::MemoryFill(config, is_second_filler);
         }
         break;
     }
 
     case GPU_REG_INDEX(display_transfer_config.trigger): {
-        const auto& temp = g_regs.display_transfer_config;
-        Regs::DisplayTransferConfig config;
-        std::memcpy(&config, &temp, sizeof(Regs::DisplayTransferConfig));
-        if (config.trigger & 1) {
+        if (g_regs.display_transfer_config.trigger & 1) {
 
             if (Pica::g_debug_context)
                 Pica::g_debug_context->OnEvent(Pica::DebugContext::Event::IncomingDisplayTransfer,
                                                nullptr);
-            VideoCore::DisplayTransfer(std::move(config));
+            VideoCore::DisplayTransfer(g_regs.display_transfer_config);
         }
         break;
     }
@@ -98,14 +93,13 @@ inline void Write(u32 addr, const T data) {
         if (config.trigger & 1) {
 
             u32* start = (u32*)g_memory->GetPhysicalPointer(config.GetPhysicalAddress());
-            Pica::CommandProcessor::CommandList cmdlist(start, start + config.size);
 
             if (Pica::g_debug_context && Pica::g_debug_context->recorder) {
                 Pica::g_debug_context->recorder->MemoryAccessed((u8*)start, config.size,
                                                                 config.GetPhysicalAddress());
             }
 
-            VideoCore::ProcessCommandList(std::move(cmdlist));
+            VideoCore::ProcessCommandList(start, config.size);
         }
         break;
     }

@@ -91,11 +91,11 @@ u16 GetResolutionScaleFactor() {
     }
 }
 
-void ProcessCommandList(Pica::CommandProcessor::CommandList&& command_list) {
+void ProcessCommandList(const u32* head, u32 length) {
     if (Settings::values.use_asynchronous_gpu_emulation) {
-        g_gpu_thread->SubmitList(std::move(command_list));
+        g_gpu_thread->SubmitList(head, length);
     } else {
-        Pica::CommandProcessor::ProcessCommandList(std::move(command_list));
+        Pica::CommandProcessor::ProcessCommandList(head, length);
     }
 }
 
@@ -107,19 +107,19 @@ void SwapBuffers() {
     }
 }
 
-void DisplayTransfer(GPU::Regs::DisplayTransferConfig&& config) {
+void DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
     if (Settings::values.use_asynchronous_gpu_emulation) {
-        g_gpu_thread->DisplayTransfer(std::move(config));
+        g_gpu_thread->DisplayTransfer(config);
     } else {
-        Pica::CommandProcessor::ProcessDisplayTransfer(std::move(config));
+        Pica::CommandProcessor::ProcessDisplayTransfer(config);
     }
 }
 
-void MemoryFill(GPU::Regs::MemoryFillConfig&& config, bool is_second_filler) {
+void MemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
     if (Settings::values.use_asynchronous_gpu_emulation) {
-        g_gpu_thread->MemoryFill(std::move(config), is_second_filler);
+        g_gpu_thread->MemoryFill(config, is_second_filler);
     } else {
-        Pica::CommandProcessor::ProcessMemoryFill(std::move(config), is_second_filler);
+        Pica::CommandProcessor::ProcessMemoryFill(config, is_second_filler);
     }
 }
 

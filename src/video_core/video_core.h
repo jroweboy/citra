@@ -51,16 +51,16 @@ extern Memory::MemorySystem* g_memory;
 /// Initialize the video core
 Core::System::ResultStatus Init(Frontend::EmuWindow& emu_window, Memory::MemorySystem& memory);
 
-void ProcessCommandList(Pica::CommandProcessor::CommandList&& command_list);
+void ProcessCommandList(const u32* head, u32 length);
 
 /// Notify rasterizer that it should swap the current framebuffer
 void SwapBuffers();
 
 /// Perform a DisplayTransfer (accelerated by the rasterizer if available)
-void DisplayTransfer(GPU::Regs::DisplayTransferConfig&& config);
+void DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config);
 
 /// Perform a MemoryFill (accelerated by the rasterizer if available)
-void MemoryFill(GPU::Regs::MemoryFillConfig&& config, bool is_second_filler);
+void MemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler);
 
 /// Notify rasterizer that any caches of the specified region should be flushed to Switch memory
 void FlushRegion(VAddr addr, u64 size);

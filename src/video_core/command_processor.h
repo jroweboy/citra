@@ -34,12 +34,10 @@ static_assert(std::is_standard_layout<CommandHeader>::value == true,
               "CommandHeader does not use standard layout");
 static_assert(sizeof(CommandHeader) == sizeof(u32), "CommandHeader has incorrect size!");
 
-using CommandList = std::vector<u32>;
+void ProcessCommandList(const u32*, u32);
 
-void ProcessCommandList(CommandList&&);
+void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig&);
 
-void ProcessDisplayTransfer(GPU::Regs::DisplayTransferConfig&&);
-
-void ProcessMemoryFill(GPU::Regs::MemoryFillConfig&&, bool);
+void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig&, bool);
 
 } // namespace Pica::CommandProcessor

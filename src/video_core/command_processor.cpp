@@ -146,9 +146,11 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
 
     switch (id) {
     // Trigger IRQ
-    case PICA_REG_INDEX(trigger_irq):
+    case PICA_REG_INDEX(trigger_irq): {
+        std::lock_guard lock(HLE::g_hle_lock);
         Service::GSP::SignalInterrupt(Service::GSP::InterruptId::P3D);
         break;
+    }
 
     case PICA_REG_INDEX(pipeline.triangle_topology):
         g_state.primitive_assembler.Reconfigure(regs.pipeline.triangle_topology);
@@ -270,11 +272,9 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
 
         u32* start = (u32*)VideoCore::g_memory->GetPhysicalPointer(
             regs.pipeline.command_buffer.GetPhysicalAddress(index));
-        Pica::CommandProcessor::CommandList cmdlist(
-            start, start + regs.pipeline.command_buffer.GetSize(index));
-        g_state.cmd_list.head = cmdlist;
-        g_state.cmd_list.current_ptr = g_state.cmd_list.head.data();
-        g_state.cmd_list.length = regs.pipeline.command_buffer.GetSize(index) / sizeof(u32);
+        auto& cmd_list = g_state.cmd_list;
+        cmd_list.head_ptr = cmd_list.current_ptr = start;
+        cmd_list.length = regs.pipeline.command_buffer.GetSize(index) / sizeof(u32);
         break;
     }
 
@@ -655,17 +655,16 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
                                  reinterpret_cast<void*>(&id));
 }
 
-MICROPROFILE_SCOPE(GPU_CmdlistProcessing);
-void ProcessCommandList(CommandList&& cmdlist) {
+void ProcessCommandList(const u32* head, u32 length) {
+    MICROPROFILE_SCOPE(GPU_CmdlistProcessing);
     auto& cmd_list = g_state.cmd_list;
-    cmd_list.head = std::move(cmdlist);
-    cmd_list.current_ptr = cmd_list.head.data();
-    cmd_list.length = cmdlist.size() / sizeof(u32);
+    cmd_list.current_ptr = cmd_list.head_ptr = head;
+    cmd_list.length = length / sizeof(u32);
 
-    while (cmd_list.current_ptr < cmd_list.head.data() + cmd_list.length) {
+    while (cmd_list.current_ptr < cmd_list.head_ptr + cmd_list.length) {
 
         // Align read pointer to 8 bytes
-        if ((cmd_list.head.data() - cmd_list.current_ptr) % 2 != 0)
+        if ((cmd_list.head_ptr - cmd_list.current_ptr) % 2 != 0)
             ++cmd_list.current_ptr;
 
         u32 value = *cmd_list.current_ptr++;
@@ -679,10 +678,7 @@ void ProcessCommandList(CommandList&& cmdlist) {
         }
     }
 
-    {
-        // std::lock_guard lock(HLE::g_hle_lock);
-        GPU::g_regs.command_processor_config.trigger = 0;
-    }
+    GPU::g_regs.command_processor_config.trigger = 0;
 }
 
 static Common::Vec4<u8> DecodePixel(GPU::Regs::PixelFormat input_format, const u8* src_pixel) {
@@ -761,8 +757,8 @@ static void MemoryFill(const GPU::Regs::MemoryFillConfig& config) {
     }
 }
 
-MICROPROFILE_SCOPE(GPU_DisplayTransfer);
 static void DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
+    MICROPROFILE_SCOPE(GPU_DisplayTransfer);
     const PAddr src_addr = config.GetPhysicalInputAddress();
     const PAddr dst_addr = config.GetPhysicalOutputAddress();
 
@@ -938,8 +934,8 @@ static void DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
     }
 }
 
-MICROPROFILE_SCOPE(GPU_TextureCopy);
 static void TextureCopy(const GPU::Regs::DisplayTransferConfig& config) {
+    MICROPROFILE_SCOPE(GPU_TextureCopy);
     const PAddr src_addr = config.GetPhysicalInputAddress();
     const PAddr dst_addr = config.GetPhysicalOutputAddress();
 
@@ -1021,7 +1017,7 @@ static void TextureCopy(const GPU::Regs::DisplayTransferConfig& config) {
     }
 }
 
-void ProcessDisplayTransfer(GPU::Regs::DisplayTransferConfig&& config) {
+void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
     if (config.is_texture_copy) {
         TextureCopy(config);
         LOG_TRACE(HW_GPU,
@@ -1041,20 +1037,26 @@ void ProcessDisplayTransfer(GPU::Regs::DisplayTransferConfig&& config) {
                   config.output_width.Value(), config.output_height.Value(),
                   static_cast<u32>(config.output_format.Value()), config.flags);
     }
+    GPU::g_regs.display_transfer_config.trigger = 0;
+
     {
-        // std::lock_guard lock(HLE::g_hle_lock);
-        GPU::g_regs.display_transfer_config.trigger = 0;
+        std::lock_guard lock(HLE::g_hle_lock);
         Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PPF);
     }
 }
 
-MICROPROFILE_SCOPE(GPU_MemoryFill);
-void ProcessMemoryFill(GPU::Regs::MemoryFillConfig&& config, bool is_second_filler) {
+void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
+    MICROPROFILE_SCOPE(GPU_MemoryFill);
     MemoryFill(config);
+    // Reset "trigger" flag and set the "finish" flag
+    // NOTE: This was confirmed to happen on hardware even if "address_start" is zero.
+    GPU::g_regs.memory_fill_config[is_second_filler ? 1 : 0].trigger.Assign(0);
+    GPU::g_regs.memory_fill_config[is_second_filler ? 1 : 0].finished.Assign(1);
+
+    // It seems that it won't signal interrupt if "address_start" is zero.
+    // TODO: hwtest this
     {
-        // std::lock_guard lock(HLE::g_hle_lock);
-        // It seems that it won't signal interrupt if "address_start" is zero.
-        // TODO: hwtest this
+        std::lock_guard lock(HLE::g_hle_lock);
         if (config.GetStartAddress() != 0) {
             if (!is_second_filler) {
                 Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PSC0);
@@ -1062,11 +1064,6 @@ void ProcessMemoryFill(GPU::Regs::MemoryFillConfig&& config, bool is_second_fill
                 Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PSC1);
             }
         }
-
-        // Reset "trigger" flag and set the "finish" flag
-        // NOTE: This was confirmed to happen on hardware even if "address_start" is zero.
-        GPU::g_regs.memory_fill_config[is_second_filler ? 1 : 0].trigger.Assign(0);
-        GPU::g_regs.memory_fill_config[is_second_filler ? 1 : 0].finished.Assign(1);
     }
 }
 

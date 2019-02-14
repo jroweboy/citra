@@ -129,7 +129,7 @@ struct State {
 
     /// Current Pica command list
     struct {
-        Pica::CommandProcessor::CommandList head;
+        const u32* head_ptr;
         const u32* current_ptr;
         u32 length;
     } cmd_list;
