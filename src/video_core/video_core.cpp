@@ -107,19 +107,19 @@ void SwapBuffers() {
     }
 }
 
-void DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
+void DisplayTransfer(const GPU::Regs::DisplayTransferConfig* config) {
     if (Settings::values.use_asynchronous_gpu_emulation) {
         g_gpu_thread->DisplayTransfer(config);
     } else {
-        Pica::CommandProcessor::ProcessDisplayTransfer(config);
+        Pica::CommandProcessor::ProcessDisplayTransfer(*config);
     }
 }
 
-void MemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
+void MemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
     if (Settings::values.use_asynchronous_gpu_emulation) {
         g_gpu_thread->MemoryFill(config, is_second_filler);
     } else {
-        Pica::CommandProcessor::ProcessMemoryFill(config, is_second_filler);
+        Pica::CommandProcessor::ProcessMemoryFill(*config, is_second_filler);
     }
 }
 

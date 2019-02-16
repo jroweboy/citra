@@ -26,13 +26,11 @@ namespace VideoCommon::GPUThread {
 
 /// Command to signal to the GPU thread that a command list is ready for processing
 struct SubmitListCommand {
-    // SubmitListCommand() : head(nullptr), length(0) {}
+    // In order for the variant to be default constructable, the first element needs a default
+    // constructor
+    constexpr SubmitListCommand() : head(nullptr), length(0) {}
     explicit constexpr SubmitListCommand(const u32* head, u32 length)
         : head(head), length(length) {}
-    // SubmitListCommand(SubmitListCommand&&) = default;
-    // SubmitListCommand& operator=(SubmitListCommand&&) = default;
-    // SubmitListCommand& operator=(const SubmitListCommand&) = default;
-
     const u32* head;
     u32 length;
 };
@@ -45,8 +43,6 @@ static_assert(std::is_copy_constructible<SubmitListCommand>::value,
 /// Command to signal to the GPU thread that a swap buffers is pending
 struct SwapBuffersCommand final {
     explicit constexpr SwapBuffersCommand(std::promise<void>* barrier) : barrier{barrier} {}
-    // SwapBuffersCommand(SwapBuffersCommand&&) = default;
-    // SwapBuffersCommand& operator=(SwapBuffersCommand&&) = default;
 
     std::promise<void>* barrier;
 };
@@ -60,8 +56,6 @@ struct MemoryFillCommand final {
     explicit constexpr MemoryFillCommand(const GPU::Regs::MemoryFillConfig* config,
                                          bool is_second_filler)
         : config{config}, is_second_filler(is_second_filler) {}
-    // MemoryFillCommand(MemoryFillCommand&&) = default;
-    // MemoryFillCommand& operator=(MemoryFillCommand&&) = default;
 
     const GPU::Regs::MemoryFillConfig* config;
     bool is_second_filler;
@@ -75,8 +69,6 @@ static_assert(std::is_copy_constructible<MemoryFillCommand>::value,
 struct DisplayTransferCommand final {
     explicit constexpr DisplayTransferCommand(const GPU::Regs::DisplayTransferConfig* config)
         : config{config} {}
-    // DisplayTransferCommand(DisplayTransferCommand&&) = default;
-    // DisplayTransferCommand& operator=(DisplayTransferCommand&&) = default;
 
     const GPU::Regs::DisplayTransferConfig* config;
 };
@@ -89,11 +81,9 @@ static_assert(std::is_copy_constructible<DisplayTransferCommand>::value,
 struct FlushRegionCommand final {
     explicit constexpr FlushRegionCommand(VAddr addr, u64 size, std::promise<void>* barrier)
         : addr{addr}, size{size}, barrier{barrier} {}
-    // FlushRegionCommand(FlushRegionCommand&&) = default;
-    // FlushRegionCommand& operator=(FlushRegionCommand&&) = default;
 
-    const VAddr addr;
-    const u64 size;
+    VAddr addr;
+    u64 size;
     std::promise<void>* barrier;
 };
 static_assert(std::is_copy_assignable<FlushRegionCommand>::value,
@@ -104,13 +94,9 @@ static_assert(std::is_copy_constructible<FlushRegionCommand>::value,
 /// Command to signal to the GPU thread to invalidate a region
 struct InvalidateRegionCommand final {
     explicit constexpr InvalidateRegionCommand(VAddr addr, u64 size) : addr{addr}, size{size} {}
-    // InvalidateRegionCommand(InvalidateRegionCommand&&) = default;
-    // InvalidateRegionCommand& operator=(InvalidateRegionCommand&&) = default;
 
-    InvalidateRegionCommand& operator=(InvalidateRegionCommand&&) = default;
-    InvalidateRegionCommand& operator=(const InvalidateRegionCommand&) = default;
-    const VAddr addr;
-    const u64 size;
+    VAddr addr;
+    u64 size;
 };
 static_assert(std::is_copy_assignable<InvalidateRegionCommand>::value,
               "InvalidateRegionCommand is not copy assignable");
@@ -122,11 +108,9 @@ struct FlushAndInvalidateRegionCommand final {
     explicit constexpr FlushAndInvalidateRegionCommand(VAddr addr, u64 size,
                                                        std::promise<void>* barrier)
         : addr{addr}, size{size}, barrier{barrier} {}
-    // FlushAndInvalidateRegionCommand(FlushAndInvalidateRegionCommand&&) = default;
-    // FlushAndInvalidateRegionCommand& operator=(FlushAndInvalidateRegionCommand&&) = default;
 
     VAddr addr;
-    const u64 size;
+    u64 size;
     std::promise<void>* barrier;
 };
 static_assert(std::is_copy_assignable<FlushAndInvalidateRegionCommand>::value,
@@ -141,35 +125,8 @@ using CommandData =
 /// Struct used to synchronize the GPU thread
 struct SynchState final {
     std::atomic<bool> is_running{true};
-    std::atomic<bool> is_idle{true};
-    std::condition_variable signal_condition;
-    std::mutex signal_mutex;
-    std::condition_variable idle_condition;
-    std::mutex idle_mutex;
 
-    // We use two queues for sending commands to the GPU thread, one for writing (push_queue) to
-    // and one for reading from (pop_queue). These are swapped whenever the current pop_queue
-    // becomes empty. This allows for efficient thread-safe access, as it does not require any
-    // copies.
-
-    // using CommandQueue = std::queue<CommandData>;
-    // std::array<CommandQueue, 2> command_queues;
-    // CommandQueue* push_queue{&command_queues[0]};
-    // CommandQueue* pop_queue{&command_queues[1]};
-    // boost::lockfree::spsc_queue<CommandData, boost::lockfree::capacity<1024>> command_queue;
-    Common::SPSCQueue<CommandData> command_queue;
-
-    /// Returns true if the GPU thread should be idle, meaning there are no commands to process
-    // bool IsIdle() const {
-    //    return command_queues[0].empty() && command_queues[1].empty();
-    //}
-
-    /// Swaps the write queue (push_queue) and the read queue (pop_queue)
-    // void SwapQueues() {
-    //    CommandQueue* const next_push_queue = pop_queue;
-    //    pop_queue = push_queue;
-    //    push_queue = next_push_queue;
-    //}
+    boost::lockfree::spsc_queue<CommandData, boost::lockfree::capacity<1024>> command_queue;
 };
 
 /// Class used to manage the GPU thread
@@ -184,9 +141,9 @@ public:
     /// Swap buffers (render frame)
     void SwapBuffers();
 
-    void DisplayTransfer(const GPU::Regs::DisplayTransferConfig&);
+    void DisplayTransfer(const GPU::Regs::DisplayTransferConfig*);
 
-    void MemoryFill(const GPU::Regs::MemoryFillConfig&, bool is_second_filler);
+    void MemoryFill(const GPU::Regs::MemoryFillConfig*, bool is_second_filler);
 
     /// Notify rasterizer that any caches of the specified region should be flushed to Switch
     /// memory

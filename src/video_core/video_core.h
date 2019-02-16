@@ -57,10 +57,10 @@ void ProcessCommandList(const u32* head, u32 length);
 void SwapBuffers();
 
 /// Perform a DisplayTransfer (accelerated by the rasterizer if available)
-void DisplayTransfer(const GPU::Regs::DisplayTransferConfig& config);
+void DisplayTransfer(const GPU::Regs::DisplayTransferConfig* config);
 
 /// Perform a MemoryFill (accelerated by the rasterizer if available)
-void MemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler);
+void MemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler);
 
 /// Notify rasterizer that any caches of the specified region should be flushed to Switch memory
 void FlushRegion(VAddr addr, u64 size);

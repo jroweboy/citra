@@ -21,9 +21,9 @@ static void ExecuteCommand(CommandData* command, VideoCore::RendererBase& render
         renderer.SwapBuffers();
         data->barrier->set_value();
     } else if (const auto data = std::get_if<MemoryFillCommand>(command)) {
-        Pica::CommandProcessor::ProcessMemoryFill(data->config, data->is_second_filler);
+        Pica::CommandProcessor::ProcessMemoryFill(*(data->config), data->is_second_filler);
     } else if (const auto data = std::get_if<DisplayTransferCommand>(command)) {
-        Pica::CommandProcessor::ProcessDisplayTransfer(data->config);
+        Pica::CommandProcessor::ProcessDisplayTransfer(*(data->config));
     } else if (const auto data = std::get_if<FlushRegionCommand>(command)) {
         renderer.Rasterizer()->FlushRegion(data->addr, data->size);
         data->barrier->set_value();
@@ -43,14 +43,6 @@ static void RunThread(VideoCore::RendererBase& renderer, SynchState& state) {
     MicroProfileOnThreadCreate("GpuThread");
     Common::SetCurrentThreadName("GpuThread");
 
-    // auto WaitForWakeup = [&]() {
-    //    std::unique_lock<std::mutex> lock{state.signal_mutex};
-    //    state.signal_condition.wait(lock, [&] { return !state.IsIdle() || !state.is_running; });
-    //};
-
-    // Wait for first GPU command before acquiring the window context
-    // WaitForWakeup();
-
     // If emulation was stopped during disk shader loading, abort before trying to acquire context
     if (!state.is_running) {
         return;
@@ -63,40 +55,10 @@ static void RunThread(VideoCore::RendererBase& renderer, SynchState& state) {
             return;
         }
 
-        //{
-        // Thread has been woken up, so make the previous write queue the next read queue
-        //    std::lock_guard<std::mutex> lock{state.signal_mutex};
-        //    state.SwapQueues();
-        //}
-
-        //{
-        //    std::lock_guard lock(state.idle_mutex);
-        //    state.is_idle = false;
-        // }
-
-        // Execute all of the GPU commands
-        // while (!state.->empty()) {
-        // CommandData value;
-        // while (state.command_queue.pop(value)) {
-        //    ExecuteCommand(&value, renderer);
-        //}
-
-        ExecuteCommand(&state.command_queue.PopWait(), renderer);
-
-        //   state.pop_queue->pop();
-        //}
-
-        // Signal that the GPU thread has finished processing commands
-        // if (state.IsIdle()) {
-        //     {
-        //        std::lock_guard lock(state.idle_mutex);
-        //       state.is_idle = true;
-        //    }
-        //    state.idle_condition.notify_one();
-        //}
-
-        // Wait for CPU thread to send more GPU commands
-        // WaitForWakeup();
+        CommandData value;
+        while (state.command_queue.pop(value)) {
+            ExecuteCommand(&value, renderer);
+        }
     }
 }
 
@@ -106,13 +68,8 @@ ThreadManager::ThreadManager(VideoCore::RendererBase& renderer) : renderer{rende
 }
 
 ThreadManager::~ThreadManager() {
-    //{
     // Notify GPU thread that a shutdown is pending
-    //    std::lock_guard<std::mutex> lock{state.signal_mutex};
-    //    state.is_running = false;
-    //}
-
-    // state.signal_condition.notify_one();
+    state.is_running.exchange(false);
     thread->join();
 }
 
@@ -134,7 +91,7 @@ void ThreadManager::DisplayTransfer(const GPU::Regs::DisplayTransferConfig* conf
     PushCommand(DisplayTransferCommand{config});
 }
 
-void ThreadManager::MemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
+void ThreadManager::MemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
     PushCommand(MemoryFillCommand{config, is_second_filler});
 }
 
@@ -156,22 +113,11 @@ void ThreadManager::FlushAndInvalidateRegion(VAddr addr, u64 size) {
 
 void ThreadManager::PushCommand(CommandData&& command_data, std::future<void>* wait_for_idle) {
     // Push the command to the GPU thread
-    // state.command_queue.push(std::move(command_data));
-    state.command_queue.Push(std::move(command_data));
-
-    // Signal the GPU thread that commands are pending
-    // state.signal_condition.notify_one();
+    state.command_queue.push(std::move(command_data));
 
     if (wait_for_idle != nullptr) {
+        // TODO handle the case where emulation is shutting down
         wait_for_idle->wait();
-        // Wait for the GPU to be idle (all commands to be executed)
-        // std::unique_lock<std::mutex> lock{state.idle_mutex};
-
-        // for (int i = 10; i > 0; i--)
-        //    HLE::g_hle_lock.unlock();
-
-        // for (int i = 10; i > 0; i--)
-        //    HLE::g_hle_lock.lock();
     }
 }
 

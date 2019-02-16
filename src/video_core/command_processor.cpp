@@ -147,7 +147,7 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
     switch (id) {
     // Trigger IRQ
     case PICA_REG_INDEX(trigger_irq): {
-        std::lock_guard lock(HLE::g_hle_lock);
+        // std::lock_guard lock(HLE::g_hle_lock);
         Service::GSP::SignalInterrupt(Service::GSP::InterruptId::P3D);
         break;
     }
@@ -989,9 +989,17 @@ static void TextureCopy(const GPU::Regs::DisplayTransferConfig& config) {
     std::size_t contiguous_output_size =
         config.texture_copy.size / output_width * (output_width + output_gap);
     // Only need to flush output if it has a gap
-    const auto FlushInvalidate_fn = (output_gap != 0) ? Memory::RasterizerFlushAndInvalidateRegion
-                                                      : Memory::RasterizerInvalidateRegion;
-    FlushInvalidate_fn(config.GetPhysicalOutputAddress(), static_cast<u32>(contiguous_output_size));
+    // const auto FlushInvalidate_fn = (output_gap != 0) ?
+    // &VideoCore::g_renderer->Rasterizer()->FlushAndInvalidateRegion
+    //                                                  :
+    //                                                  &VideoCore::g_renderer->Rasterizer()->InvalidateRegion;
+    if (output_gap != 0) {
+        VideoCore::g_renderer->Rasterizer()->FlushAndInvalidateRegion(
+            config.GetPhysicalOutputAddress(), static_cast<u32>(contiguous_output_size));
+    } else {
+        VideoCore::g_renderer->Rasterizer()->InvalidateRegion(
+            config.GetPhysicalOutputAddress(), static_cast<u32>(contiguous_output_size));
+    }
 
     u32 remaining_input = input_width;
     u32 remaining_output = output_width;
@@ -1040,12 +1048,12 @@ void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
     GPU::g_regs.display_transfer_config.trigger = 0;
 
     {
-        std::lock_guard lock(HLE::g_hle_lock);
+        // std::lock_guard lock(HLE::g_hle_lock);
         Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PPF);
     }
 }
 
-void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
+void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
     MICROPROFILE_SCOPE(GPU_MemoryFill);
     MemoryFill(config);
     // Reset "trigger" flag and set the "finish" flag
@@ -1056,7 +1064,7 @@ void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second
     // It seems that it won't signal interrupt if "address_start" is zero.
     // TODO: hwtest this
     {
-        std::lock_guard lock(HLE::g_hle_lock);
+        // std::lock_guard lock(HLE::g_hle_lock);
         if (config.GetStartAddress() != 0) {
             if (!is_second_filler) {
                 Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PSC0);

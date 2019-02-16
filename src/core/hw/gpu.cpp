@@ -71,7 +71,7 @@ inline void Write(u32 addr, const T data) {
         if (config.trigger) {
             LOG_TRACE(HW_GPU, "MemoryFill started from {:#010X} to {:#010X}",
                       config.GetStartAddress(), config.GetEndAddress());
-            VideoCore::MemoryFill(config, is_second_filler);
+            VideoCore::MemoryFill(&config, is_second_filler);
         }
         break;
     }
@@ -82,7 +82,7 @@ inline void Write(u32 addr, const T data) {
             if (Pica::g_debug_context)
                 Pica::g_debug_context->OnEvent(Pica::DebugContext::Event::IncomingDisplayTransfer,
                                                nullptr);
-            VideoCore::DisplayTransfer(g_regs.display_transfer_config);
+            VideoCore::DisplayTransfer(&g_regs.display_transfer_config);
         }
         break;
     }
