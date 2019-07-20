@@ -20,17 +20,15 @@ namespace Memory {
 class MemorySystem;
 }
 
-namespace VideoCommon::GPUThread {
-class ThreadManager;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Video Core namespace
 
 namespace VideoCore {
 
+class GPUBackend;
+
 extern std::unique_ptr<RendererBase> g_renderer; ///< Renderer plugin
-extern std::unique_ptr<VideoCommon::GPUThread::ThreadManager> g_gpu_thread;
+extern std::unique_ptr<VideoCore::GPUBackend> g_gpu;
 
 // TODO: Wrap these in a user settings struct along with any other graphics settings (often set from
 // qt ui)

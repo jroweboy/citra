@@ -14,7 +14,6 @@
 #include <optional>
 #include <thread>
 #include <variant>
-#include <boost/lockfree/spsc_queue.hpp>
 #include "common/threadsafe_queue.h"
 #include "video_core/command_processor.h"
 
@@ -22,7 +21,7 @@ namespace VideoCore {
 class RendererBase;
 }
 
-namespace VideoCommon::GPUThread {
+namespace VideoCore::GPUThread {
 
 /// Command to signal to the GPU thread that a command list is ready for processing
 struct SubmitListCommand {
@@ -42,9 +41,7 @@ static_assert(std::is_copy_constructible<SubmitListCommand>::value,
 
 /// Command to signal to the GPU thread that a swap buffers is pending
 struct SwapBuffersCommand final {
-    explicit constexpr SwapBuffersCommand(std::promise<void>* barrier) : barrier{barrier} {}
-
-    std::promise<void>* barrier;
+    explicit constexpr SwapBuffersCommand() {}
 };
 
 static_assert(std::is_copy_assignable<SwapBuffersCommand>::value,
@@ -79,12 +76,10 @@ static_assert(std::is_copy_constructible<DisplayTransferCommand>::value,
 
 /// Command to signal to the GPU thread to flush a region
 struct FlushRegionCommand final {
-    explicit constexpr FlushRegionCommand(VAddr addr, u64 size, std::promise<void>* barrier)
-        : addr{addr}, size{size}, barrier{barrier} {}
+    explicit constexpr FlushRegionCommand(VAddr addr, u64 size) : addr{addr}, size{size} {}
 
     VAddr addr;
     u64 size;
-    std::promise<void>* barrier;
 };
 static_assert(std::is_copy_assignable<FlushRegionCommand>::value,
               "FlushRegionCommand is not copy assignable");
@@ -105,13 +100,11 @@ static_assert(std::is_copy_constructible<InvalidateRegionCommand>::value,
 
 /// Command to signal to the GPU thread to flush and invalidate a region
 struct FlushAndInvalidateRegionCommand final {
-    explicit constexpr FlushAndInvalidateRegionCommand(VAddr addr, u64 size,
-                                                       std::promise<void>* barrier)
-        : addr{addr}, size{size}, barrier{barrier} {}
+    explicit constexpr FlushAndInvalidateRegionCommand(VAddr addr, u64 size)
+        : addr{addr}, size{size} {}
 
     VAddr addr;
     u64 size;
-    std::promise<void>* barrier;
 };
 static_assert(std::is_copy_assignable<FlushAndInvalidateRegionCommand>::value,
               "FlushAndInvalidateRegionCommand is not copy assignable");
@@ -122,11 +115,58 @@ using CommandData =
     std::variant<SubmitListCommand, SwapBuffersCommand, MemoryFillCommand, DisplayTransferCommand,
                  FlushRegionCommand, InvalidateRegionCommand, FlushAndInvalidateRegionCommand>;
 
+struct CommandDataContainer {
+    CommandDataContainer() = default;
+
+    CommandDataContainer(CommandData&& data, u64 next_fence)
+        : data{std::move(data)}, fence{next_fence} {}
+
+    CommandData data;
+    u64 fence{};
+};
+
 /// Struct used to synchronize the GPU thread
 struct SynchState final {
-    std::atomic<bool> is_running{true};
+    std::atomic_bool is_running{true};
+    std::atomic_int queued_frame_count{};
+    std::mutex synchronization_mutex;
+    std::mutex commands_mutex;
+    std::condition_variable commands_condition;
+    std::condition_variable synchronization_condition;
 
-    boost::lockfree::spsc_queue<CommandData, boost::lockfree::capacity<1024>> command_queue;
+    /// Returns true if the gap in GPU commands is small enough that we can consider the CPU and GPU
+    /// synchronized. This is entirely empirical.
+    bool IsSynchronized() const {
+        constexpr std::size_t max_queue_gap{5};
+        return queue.Size() <= max_queue_gap;
+    }
+
+    void TrySynchronize() {
+        if (IsSynchronized()) {
+            std::lock_guard lock{synchronization_mutex};
+            synchronization_condition.notify_one();
+        }
+    }
+
+    void WaitForSynchronization(u64 fence);
+
+    void SignalCommands() {
+        if (queue.Empty()) {
+            return;
+        }
+
+        commands_condition.notify_one();
+    }
+
+    void WaitForCommands() {
+        std::unique_lock lock{commands_mutex};
+        commands_condition.wait(lock, [this] { return !queue.Empty(); });
+    }
+
+    using CommandQueue = Common::SPSCQueue<CommandDataContainer>;
+    CommandQueue queue;
+    u64 last_fence{};
+    std::atomic<u64> signaled_fence{};
 };
 
 /// Class used to manage the GPU thread
@@ -158,7 +198,7 @@ public:
 
 private:
     /// Pushes a command to be executed by the GPU thread
-    void PushCommand(CommandData&& command_data, std::future<void>* wait_for_idle = nullptr);
+    u64 PushCommand(CommandData&& command_data);
 
     /// Returns true if this is called by the GPU thread
     bool IsGpuThread() const {
@@ -172,4 +212,4 @@ private:
     VideoCore::RendererBase& renderer;
 };
 
-} // namespace VideoCommon::GPUThread
+} // namespace VideoCore::GPUThread

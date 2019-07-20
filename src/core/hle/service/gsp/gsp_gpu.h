@@ -429,7 +429,7 @@ private:
     /// Thread ids currently in use by the sessions connected to the GSPGPU service.
     std::array<bool, MaxGSPThreads> used_thread_ids = {false, false, false, false};
 
-    friend class SessionData;
+    friend struct SessionData;
 };
 
 ResultCode SetBufferSwap(u32 screen_id, const FrameBufferInfo& info);
