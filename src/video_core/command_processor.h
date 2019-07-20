@@ -38,6 +38,10 @@ void ProcessCommandList(const u32*, u32);
 
 void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig&);
 
-void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig&, bool);
+void AfterDisplayTransfer(const GPU::Regs::DisplayTransferConfig&);
+
+void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig&);
+
+void AfterMemoryFill(const GPU::Regs::MemoryFillConfig&, bool);
 
 } // namespace Pica::CommandProcessor

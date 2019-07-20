@@ -37,7 +37,8 @@ Layout::FramebufferLayout g_screenshot_framebuffer_layout;
 Memory::MemorySystem* g_memory;
 
 /// Initialize the video core
-Core::System::ResultStatus Init(Frontend::EmuWindow& emu_window, Memory::MemorySystem& memory) {
+Core::System::ResultStatus Init(Core::System& system, Frontend::EmuWindow& emu_window,
+                                Memory::MemorySystem& memory) {
     g_memory = &memory;
     Pica::Init();
 
@@ -45,9 +46,9 @@ Core::System::ResultStatus Init(Frontend::EmuWindow& emu_window, Memory::MemoryS
 
     g_renderer = std::make_unique<OpenGL::RendererOpenGL>(emu_window);
     if (Settings::values.use_asynchronous_gpu_emulation) {
-        g_gpu = std::make_unique<VideoCore::GPUParallel>(*g_renderer);
+        g_gpu = std::make_unique<VideoCore::GPUParallel>(system, *g_renderer);
     } else {
-        g_gpu = std::make_unique<VideoCore::GPUSerial>(*g_renderer);
+        g_gpu = std::make_unique<VideoCore::GPUSerial>(system, *g_renderer);
     }
     Core::System::ResultStatus result = g_renderer->Init();
 

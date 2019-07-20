@@ -40,7 +40,7 @@ inline s64 msToCycles(int ms) {
 }
 
 inline s64 msToCycles(float ms) {
-    return static_cast<s64>(BASE_CLOCK_RATE_ARM11 * (0.001f) * ms);
+    return static_cast<s64>(BASE_CLOCK_RATE_ARM11 * (0.001) * ms);
 }
 
 inline s64 msToCycles(double ms) {
@@ -48,7 +48,7 @@ inline s64 msToCycles(double ms) {
 }
 
 inline s64 usToCycles(float us) {
-    return static_cast<s64>(BASE_CLOCK_RATE_ARM11 * (0.000001f) * us);
+    return static_cast<s64>(BASE_CLOCK_RATE_ARM11 * (0.000001) * us);
 }
 
 inline s64 usToCycles(int us) {
@@ -80,7 +80,7 @@ inline s64 usToCycles(u64 us) {
 }
 
 inline s64 nsToCycles(float ns) {
-    return static_cast<s64>(BASE_CLOCK_RATE_ARM11 * (0.000000001f) * ns);
+    return static_cast<s64>(BASE_CLOCK_RATE_ARM11 * (0.000000001) * ns);
 }
 
 inline s64 nsToCycles(int ns) {

@@ -212,7 +212,7 @@ System::ResultStatus System::Init(Frontend::EmuWindow& emu_window, u32 system_mo
     Service::Init(*this);
     GDBStub::Init();
 
-    ResultStatus result = VideoCore::Init(emu_window, *memory);
+    ResultStatus result = VideoCore::Init(*this, emu_window, *memory);
     if (result != ResultStatus::Success) {
         return result;
     }

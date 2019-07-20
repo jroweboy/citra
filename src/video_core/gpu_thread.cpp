@@ -5,9 +5,11 @@
 #include <chrono>
 #include "common/microprofile.h"
 #include "common/thread.h"
+#include "core/core_timing.h"
 #include "core/frontend/scope_acquire_window_context.h"
 #include "core/hle/lock.h"
 #include "core/settings.h"
+#include "video_core/command_processor.h"
 #include "video_core/gpu_thread.h"
 #include "video_core/renderer_base.h"
 
@@ -20,7 +22,8 @@ inline void ExecuteCommand(CommandData* command, VideoCore::RendererBase& render
     } else if (const auto data = std::get_if<SwapBuffersCommand>(command)) {
         renderer.SwapBuffers();
     } else if (const auto data = std::get_if<MemoryFillCommand>(command)) {
-        Pica::CommandProcessor::ProcessMemoryFill(*(data->config), data->is_second_filler);
+        Pica::CommandProcessor::ProcessMemoryFill(*(data->config));
+        Pica::CommandProcessor::AfterMemoryFill(*(data->config), data->is_second_filler);
     } else if (const auto data = std::get_if<DisplayTransferCommand>(command)) {
         Pica::CommandProcessor::ProcessDisplayTransfer(*(data->config));
     } else if (const auto data = std::get_if<FlushRegionCommand>(command)) {
@@ -63,9 +66,12 @@ static void RunThread(VideoCore::RendererBase& renderer, SynchState& state) {
     }
 }
 
-ThreadManager::ThreadManager(VideoCore::RendererBase& renderer) : renderer{renderer} {
+ThreadManager::ThreadManager(Core::System& system, VideoCore::RendererBase& renderer)
+    : system{system}, renderer{renderer} {
     thread = std::make_unique<std::thread>(RunThread, std::ref(renderer), std::ref(state));
     thread_id = thread->get_id();
+    synchronization_event = system.CoreTiming().RegisterEvent(
+        "GPUThreadSync", [this](u64 fence, s64) { state.WaitForSynchronization(fence); });
 }
 
 ThreadManager::~ThreadManager() {
@@ -79,23 +85,30 @@ void ThreadManager::SubmitList(const u32* head, u32 length) {
         return;
     }
 
-    PushCommand(SubmitListCommand(head, length));
+    const u64 fence{PushCommand(SubmitListCommand(head, length))};
+    state.WaitForSynchronization(fence);
+    // const s64 synchronization_ticks{usToCycles(9000)};
+    // system.CoreTiming().ScheduleEvent(synchronization_ticks, synchronization_event, fence);
 }
 
 void ThreadManager::SwapBuffers() {
-    PushCommand(SwapBuffersCommand{});
+    const u64 fence{PushCommand(SwapBuffersCommand{})};
+    state.WaitForSynchronization(fence);
 }
 
 void ThreadManager::DisplayTransfer(const GPU::Regs::DisplayTransferConfig* config) {
-    PushCommand(DisplayTransferCommand{config});
+    const u64 fence{PushCommand(DisplayTransferCommand{config})};
+    state.WaitForSynchronization(fence);
 }
 
 void ThreadManager::MemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
-    PushCommand(MemoryFillCommand{config, is_second_filler});
+    const u64 fence{PushCommand(MemoryFillCommand{config, is_second_filler})};
+    state.WaitForSynchronization(fence);
 }
 
 void ThreadManager::FlushRegion(VAddr addr, u64 size) {
-    PushCommand(FlushRegionCommand(addr, size));
+    const u64 fence{PushCommand(FlushRegionCommand(addr, size))};
+    state.WaitForSynchronization(fence);
 }
 
 void ThreadManager::InvalidateRegion(VAddr addr, u64 size) {
@@ -103,7 +116,8 @@ void ThreadManager::InvalidateRegion(VAddr addr, u64 size) {
 }
 
 void ThreadManager::FlushAndInvalidateRegion(VAddr addr, u64 size) {
-    PushCommand(FlushAndInvalidateRegionCommand(addr, size));
+    const u64 fence{PushCommand(FlushAndInvalidateRegionCommand(addr, size))};
+    state.WaitForSynchronization(fence);
 }
 
 u64 ThreadManager::PushCommand(CommandData&& command_data) {

@@ -42,7 +42,7 @@ protected:
 
 class GPUSerial : public GPUBackend {
 public:
-    explicit GPUSerial(VideoCore::RendererBase& renderer);
+    explicit GPUSerial(Core::System& system, VideoCore::RendererBase& renderer);
 
     ~GPUSerial();
 
@@ -54,11 +54,14 @@ public:
     void FlushRegion(VAddr addr, u64 size);
     void InvalidateRegion(VAddr addr, u64 size);
     void FlushAndInvalidateRegion(VAddr addr, u64 size);
+
+private:
+    Core::System& system;
 };
 
 class GPUParallel : public GPUBackend {
 public:
-    explicit GPUParallel(VideoCore::RendererBase& renderer);
+    explicit GPUParallel(Core::System& system, VideoCore::RendererBase& renderer);
 
     ~GPUParallel();
 

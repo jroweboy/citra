@@ -10,11 +10,11 @@
 #include "core/frontend/emu_window.h"
 #include "video_core/command_processor.h"
 
+class RendererBase;
+
 namespace Frontend {
 class EmuWindow;
 }
-
-class RendererBase;
 
 namespace Memory {
 class MemorySystem;
@@ -47,7 +47,8 @@ extern Layout::FramebufferLayout g_screenshot_framebuffer_layout;
 extern Memory::MemorySystem* g_memory;
 
 /// Initialize the video core
-Core::System::ResultStatus Init(Frontend::EmuWindow& emu_window, Memory::MemorySystem& memory);
+Core::System::ResultStatus Init(Core::System& system, Frontend::EmuWindow& emu_window,
+                                Memory::MemorySystem& memory);
 
 void ProcessCommandList(const u32* head, u32 length);
 

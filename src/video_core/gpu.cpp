@@ -13,7 +13,8 @@ GPUBackend::GPUBackend(VideoCore::RendererBase& renderer) : renderer{renderer} {
 
 GPUBackend::~GPUBackend() = default;
 
-GPUSerial::GPUSerial(VideoCore::RendererBase& renderer) : GPUBackend(renderer) {}
+GPUSerial::GPUSerial(Core::System& system, VideoCore::RendererBase& renderer)
+    : GPUBackend(renderer), system{system} {}
 
 GPUSerial::~GPUSerial() {}
 
@@ -27,10 +28,12 @@ void GPUSerial::SwapBuffers() {
 
 void GPUSerial::DisplayTransfer(const GPU::Regs::DisplayTransferConfig* config) {
     Pica::CommandProcessor::ProcessDisplayTransfer(*config);
+    Pica::CommandProcessor::AfterDisplayTransfer(*config);
 }
 
 void GPUSerial::MemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
-    Pica::CommandProcessor::ProcessMemoryFill(*config, is_second_filler);
+    Pica::CommandProcessor::ProcessMemoryFill(*config);
+    Pica::CommandProcessor::AfterMemoryFill(*config, is_second_filler);
 }
 
 void GPUSerial::FlushRegion(VAddr addr, u64 size) {
@@ -45,8 +48,8 @@ void GPUSerial::FlushAndInvalidateRegion(VAddr addr, u64 size) {
     renderer.Rasterizer()->FlushAndInvalidateRegion(addr, size);
 }
 
-GPUParallel::GPUParallel(VideoCore::RendererBase& renderer)
-    : GPUBackend(renderer), gpu_thread(renderer) {}
+GPUParallel::GPUParallel(Core::System& system, VideoCore::RendererBase& renderer)
+    : GPUBackend(renderer), gpu_thread(system, renderer) {}
 
 GPUParallel::~GPUParallel() = default;
 

@@ -15,6 +15,7 @@
 #include <thread>
 #include <variant>
 #include "common/threadsafe_queue.h"
+#include "core/core_timing.h"
 #include "video_core/command_processor.h"
 
 namespace VideoCore {
@@ -137,7 +138,7 @@ struct SynchState final {
     /// Returns true if the gap in GPU commands is small enough that we can consider the CPU and GPU
     /// synchronized. This is entirely empirical.
     bool IsSynchronized() const {
-        constexpr std::size_t max_queue_gap{5};
+        constexpr std::size_t max_queue_gap{0};
         return queue.Size() <= max_queue_gap;
     }
 
@@ -160,7 +161,8 @@ struct SynchState final {
 
     void WaitForCommands() {
         std::unique_lock lock{commands_mutex};
-        commands_condition.wait(lock, [this] { return !queue.Empty(); });
+        commands_condition.wait_for(lock, std::chrono::microseconds(1000),
+                                    [this] { return !queue.Empty(); });
     }
 
     using CommandQueue = Common::SPSCQueue<CommandDataContainer>;
@@ -172,7 +174,7 @@ struct SynchState final {
 /// Class used to manage the GPU thread
 class ThreadManager final {
 public:
-    explicit ThreadManager(VideoCore::RendererBase& renderer);
+    explicit ThreadManager(Core::System& system, VideoCore::RendererBase& renderer);
     ~ThreadManager();
 
     /// Push GPU command entries to be processed
@@ -209,7 +211,9 @@ private:
     SynchState state;
     std::unique_ptr<std::thread> thread;
     std::thread::id thread_id{};
+    Core::System& system;
     VideoCore::RendererBase& renderer;
+    Core::TimingEventType* synchronization_event{};
 };
 
 } // namespace VideoCore::GPUThread
