@@ -157,7 +157,7 @@ file(GLOB COMPAT_LIST
 file(GLOB_RECURSE ICONS ${PROJECT_SOURCE_DIR}/dist/icons/*)
 file(GLOB_RECURSE THEMES ${PROJECT_SOURCE_DIR}/dist/qt_themes/*)
 
-qt5_wrap_ui(UI_HDRS ${UIS})
+#qt5_wrap_ui(UI_HDRS ${UIS})
 
 if (ENABLE_QT_TRANSLATION)
     set(CITRA_QT_LANGUAGES "${PROJECT_SOURCE_DIR}/dist/languages" CACHE PATH "Path to the translation bundle for the Qt frontend")

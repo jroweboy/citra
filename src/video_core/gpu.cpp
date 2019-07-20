@@ -20,20 +20,22 @@ GPUSerial::~GPUSerial() {}
 
 void GPUSerial::ProcessCommandList(const u32* head, u32 length) {
     Pica::CommandProcessor::ProcessCommandList(head, length);
+    Pica::CommandProcessor::AfterCommandList();
 }
 
 void GPUSerial::SwapBuffers() {
     renderer.SwapBuffers();
+    Pica::CommandProcessor::AfterSwapBuffers();
 }
 
 void GPUSerial::DisplayTransfer(const GPU::Regs::DisplayTransferConfig* config) {
     Pica::CommandProcessor::ProcessDisplayTransfer(*config);
-    Pica::CommandProcessor::AfterDisplayTransfer(*config);
+    Pica::CommandProcessor::AfterDisplayTransfer();
 }
 
 void GPUSerial::MemoryFill(const GPU::Regs::MemoryFillConfig* config, bool is_second_filler) {
     Pica::CommandProcessor::ProcessMemoryFill(*config);
-    Pica::CommandProcessor::AfterMemoryFill(*config, is_second_filler);
+    Pica::CommandProcessor::AfterMemoryFill(is_second_filler);
 }
 
 void GPUSerial::FlushRegion(VAddr addr, u64 size) {

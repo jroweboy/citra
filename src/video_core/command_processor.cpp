@@ -150,7 +150,7 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
         // TODO: Determine if this always runs at the end of the command list so we can run this on
         // the CPU thread
         // LOG_WARNING(HW_GPU, "IRQ signalled");
-        Service::GSP::SignalInterrupt(Service::GSP::InterruptId::P3D);
+        // Service::GSP::SignalInterrupt(Service::GSP::InterruptId::P3D);
         break;
     }
 
@@ -679,7 +679,8 @@ void ProcessCommandList(const u32* head, u32 length) {
             WritePicaReg(cmd, *cmd_list.current_ptr++, header.parameter_mask);
         }
     }
-    GPU::g_regs.command_processor_config.trigger = 0;
+
+    // LOG_WARNING(HW_GPU, "Command List ended");
 }
 
 static Common::Vec4<u8> DecodePixel(GPU::Regs::PixelFormat input_format, const u8* src_pixel) {
@@ -1049,12 +1050,18 @@ void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
     }
 }
 
-void AfterDisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) {
+void AfterCommandList() {
+    Service::GSP::SignalInterrupt(Service::GSP::InterruptId::P3D);
+    GPU::g_regs.command_processor_config.trigger = 0;
+}
+
+void AfterDisplayTransfer() {
     GPU::g_regs.display_transfer_config.trigger = 0;
     Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PPF);
 }
 
-void AfterMemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_filler) {
+void AfterMemoryFill(bool is_second_filler) {
+    const auto& config = GPU::g_regs.memory_fill_config[is_second_filler];
     // Reset "trigger" flag and set the "finish" flag
     // NOTE: This was confirmed to happen on hardware even if "address_start" is zero.
     GPU::g_regs.memory_fill_config[is_second_filler ? 1 : 0].trigger.Assign(0);
@@ -1068,6 +1075,16 @@ void AfterMemoryFill(const GPU::Regs::MemoryFillConfig& config, bool is_second_f
             Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PSC1);
         }
     }
+}
+
+void AfterSwapBuffers() {
+    // Signal to GSP that GPU interrupt has occurred
+    // TODO(yuriks): hwtest to determine if PDC0 is for the Top screen and PDC1 for the Sub
+    // screen, or if both use the same interrupts and these two instead determine the
+    // beginning and end of the VBlank period. If needed, split the interrupt firing into
+    // two different intervals.
+    Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PDC0);
+    Service::GSP::SignalInterrupt(Service::GSP::InterruptId::PDC1);
 }
 
 } // namespace Pica::CommandProcessor

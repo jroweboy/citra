@@ -138,7 +138,7 @@ struct SynchState final {
     /// Returns true if the gap in GPU commands is small enough that we can consider the CPU and GPU
     /// synchronized. This is entirely empirical.
     bool IsSynchronized() const {
-        constexpr std::size_t max_queue_gap{0};
+        constexpr std::size_t max_queue_gap{100};
         return queue.Size() <= max_queue_gap;
     }
 
@@ -161,7 +161,7 @@ struct SynchState final {
 
     void WaitForCommands() {
         std::unique_lock lock{commands_mutex};
-        commands_condition.wait_for(lock, std::chrono::microseconds(1000),
+        commands_condition.wait_for(lock, std::chrono::seconds(0),
                                     [this] { return !queue.Empty(); });
     }
 
@@ -213,7 +213,10 @@ private:
     std::thread::id thread_id{};
     Core::System& system;
     VideoCore::RendererBase& renderer;
-    Core::TimingEventType* synchronization_event{};
+    Core::TimingEventType* command_list_processing_event{};
+    Core::TimingEventType* display_transfer_event{};
+    Core::TimingEventType* memory_fill_event{};
+    Core::TimingEventType* swap_buffers_event{};
 };
 
 } // namespace VideoCore::GPUThread

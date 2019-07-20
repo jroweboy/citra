@@ -36,12 +36,17 @@ static_assert(sizeof(CommandHeader) == sizeof(u32), "CommandHeader has incorrect
 
 void ProcessCommandList(const u32*, u32);
 
+void AfterCommandList();
+
 void ProcessDisplayTransfer(const GPU::Regs::DisplayTransferConfig&);
 
-void AfterDisplayTransfer(const GPU::Regs::DisplayTransferConfig&);
+void AfterDisplayTransfer();
 
 void ProcessMemoryFill(const GPU::Regs::MemoryFillConfig&);
 
-void AfterMemoryFill(const GPU::Regs::MemoryFillConfig&, bool);
+void AfterMemoryFill(bool);
+
+// TODO move somewhere else
+void AfterSwapBuffers();
 
 } // namespace Pica::CommandProcessor
