@@ -151,6 +151,7 @@ void ThreadManager::FlushAndInvalidateRegion(VAddr addr, u64 size) {
 }
 
 u64 ThreadManager::PushCommand(CommandData&& command_data) {
+
     const u64 fence{++state.last_fence};
     state.queue.Push(CommandDataContainer(std::move(command_data), fence));
     state.SignalCommands();

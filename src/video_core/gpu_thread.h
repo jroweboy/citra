@@ -155,14 +155,15 @@ struct SynchState final {
         if (queue.Empty()) {
             return;
         }
-
-        commands_condition.notify_one();
+        {
+            std::lock_guard<std::mutex> lock(commands_mutex);
+            commands_condition.notify_one();
+        }
     }
 
     void WaitForCommands() {
         std::unique_lock lock{commands_mutex};
-        commands_condition.wait_for(lock, std::chrono::seconds(0),
-                                    [this] { return !queue.Empty(); });
+        commands_condition.wait(lock, [this] { return !queue.Empty(); });
     }
 
     using CommandQueue = Common::SPSCQueue<CommandDataContainer>;

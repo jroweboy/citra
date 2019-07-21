@@ -33,6 +33,12 @@
 #include "video_core/vertex_loader.h"
 #include "video_core/video_core.h"
 
+MICROPROFILE_DEFINE(GPU_Drawing, "GPU", "Drawing", MP_RGB(50, 50, 240));
+MICROPROFILE_DEFINE(GPU_MemoryFill, "GPU", "MemoryFill", MP_RGB(100, 100, 255));
+MICROPROFILE_DEFINE(GPU_TextureCopy, "GPU", "Texture Copy", MP_RGB(100, 100, 255));
+MICROPROFILE_DEFINE(GPU_DisplayTransfer, "GPU", "DisplayTransfer", MP_RGB(100, 100, 255));
+MICROPROFILE_DEFINE(GPU_CmdlistProcessing, "GPU", "Cmdlist Processing", MP_RGB(100, 255, 100));
+
 namespace Pica::CommandProcessor {
 
 // Expand a 4-bit mask to 4-byte mask, e.g. 0b0101 -> 0x00FF00FF
@@ -40,12 +46,6 @@ static const u32 expand_bits_to_bytes[] = {
     0x00000000, 0x000000ff, 0x0000ff00, 0x0000ffff, 0x00ff0000, 0x00ff00ff, 0x00ffff00, 0x00ffffff,
     0xff000000, 0xff0000ff, 0xff00ff00, 0xff00ffff, 0xffff0000, 0xffff00ff, 0xffffff00, 0xffffffff,
 };
-
-MICROPROFILE_DEFINE(GPU_Drawing, "GPU", "Drawing", MP_RGB(50, 50, 240));
-MICROPROFILE_DEFINE(GPU_MemoryFill, "GPU", "MemoryFill", MP_RGB(100, 100, 255));
-MICROPROFILE_DEFINE(GPU_TextureCopy, "GPU", "Texture Copy", MP_RGB(100, 100, 255));
-MICROPROFILE_DEFINE(GPU_DisplayTransfer, "GPU", "DisplayTransfer", MP_RGB(100, 100, 255));
-MICROPROFILE_DEFINE(GPU_CmdlistProcessing, "GPU", "Cmdlist Processing", MP_RGB(100, 255, 100));
 
 static const char* GetShaderSetupTypeName(Shader::ShaderSetup& setup) {
     if (&setup == &g_state.vs) {
