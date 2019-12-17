@@ -89,7 +89,7 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, frame->present.handle);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                                   frame->color.handle);
-        if (!glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
             LOG_CRITICAL(Render_OpenGL, "Failed to recreate present FBO!");
         }
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, previous_draw_fbo);
@@ -115,7 +115,7 @@ public:
         state.Apply();
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                                   frame->color.handle);
-        if (!glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
             LOG_CRITICAL(Render_OpenGL, "Failed to recreate render FBO!");
         }
         prev_state.Apply();
@@ -458,7 +458,7 @@ void RendererOpenGL::RenderVideoDumping() {
         glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbos[next_pbo].handle);
         GLubyte* pixels = static_cast<GLubyte*>(glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY));
         VideoDumper::VideoFrame frame_data{layout.width, layout.height, pixels};
-        Core::System::GetInstance().VideoDumper().AddVideoFrame(frame_data);
+        Core::System::GetInstance().VideoDumper().AddVideoFrame(std::move(frame_data));
 
         glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);

@@ -30,9 +30,9 @@ public:
     virtual ~Backend();
     virtual bool StartDumping(const std::string& path, const std::string& format,
                               const Layout::FramebufferLayout& layout) = 0;
-    virtual void AddVideoFrame(const VideoFrame& frame) = 0;
-    virtual void AddAudioFrame(const AudioCore::StereoFrame16& frame) = 0;
-    virtual void AddAudioSample(const std::array<s16, 2>& sample) = 0;
+    virtual void AddVideoFrame(VideoFrame&& frame) = 0;
+    virtual void AddAudioFrame(AudioCore::StereoFrame16&& frame) = 0;
+    virtual void AddAudioSample(std::array<s16, 2>&& sample) = 0;
     virtual void StopDumping() = 0;
     virtual bool IsDumping() const = 0;
     virtual Layout::FramebufferLayout GetLayout() const = 0;
@@ -45,9 +45,9 @@ public:
                       const Layout::FramebufferLayout& /*layout*/) override {
         return false;
     }
-    void AddVideoFrame(const VideoFrame& /*frame*/) override {}
-    void AddAudioFrame(const AudioCore::StereoFrame16& /*frame*/) override {}
-    void AddAudioSample(const std::array<s16, 2>& /*sample*/) override {}
+    void AddVideoFrame(VideoFrame&& /*frame*/) override {}
+    void AddAudioFrame(AudioCore::StereoFrame16&& /*frame*/) override {}
+    void AddAudioSample(std::array<s16, 2>&& /*sample*/) override {}
     void StopDumping() override {}
     bool IsDumping() const override {
         return false;
