@@ -447,14 +447,15 @@ void RendererOpenGL::RenderVideoDumping() {
         }
 
         const auto& layout = Core::System::GetInstance().VideoDumper().GetLayout();
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, frame_dumping_framebuffer.handle);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frame_dumping_framebuffer.handle);
         DrawScreens(layout);
 
+        // Start the async transfer for the current frame data from GPU -> CPU
         glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbos[current_pbo].handle);
         glReadPixels(0, 0, layout.width, layout.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, 0);
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbos[next_pbo].handle);
 
+        // Finalize the previous frame's data transfer and submit it to the VideoDumper
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, frame_dumping_pbos[next_pbo].handle);
         GLubyte* pixels = static_cast<GLubyte*>(glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY));
         VideoDumper::VideoFrame frame_data{layout.width, layout.height, pixels};
         Core::System::GetInstance().VideoDumper().AddVideoFrame(frame_data);
