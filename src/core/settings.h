@@ -32,7 +32,17 @@ enum class MicInputType {
     Static,
 };
 
-enum class StereoRenderOption { Off, SideBySide, Anaglyph };
+enum class StereoRenderOption {
+    Off,
+    SideBySide,
+    Anaglyph,
+};
+
+enum class AsyncShaderCompileOption {
+    CPU,
+    Block,
+    Skip,
+};
 
 namespace NativeButton {
 enum Values {
@@ -147,6 +157,7 @@ struct Values {
     u16 resolution_factor;
     bool use_frame_limit;
     u16 frame_limit;
+    AsyncShaderCompileOption async_shader_compile;
 
     LayoutOption layout_option;
     bool swap_screen;

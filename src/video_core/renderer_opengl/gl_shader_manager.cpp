@@ -7,11 +7,14 @@
 #include <unordered_map>
 #include <boost/functional/hash.hpp>
 #include <boost/variant.hpp>
+#include "common/threadsafe_queue.h"
 #include "core/core.h"
 #include "video_core/renderer_opengl/gl_shader_disk_cache.h"
 #include "video_core/renderer_opengl/gl_shader_manager.h"
 
 namespace OpenGL {
+
+class ShaderCompileThread;
 
 static u64 GetUniqueIdentifier(const Pica::Regs& regs, const ProgramCode& code) {
     u64 hash = 0;
@@ -210,13 +213,17 @@ private:
     OGLShaderStage program;
 };
 
+struct CachedShader {
+    GLuint handle;
+    std::optional<ShaderDecompiler::ProgramResult> shader;
+};
+
 template <typename KeyConfigType, std::string (*CodeGenerator)(const KeyConfigType&, bool),
           GLenum ShaderType>
 class ShaderCache {
 public:
     explicit ShaderCache(bool separable) : separable(separable) {}
-    std::tuple<GLuint, std::optional<ShaderDecompiler::ProgramResult>> Get(
-        const KeyConfigType& config) {
+    CachedShader Get(const KeyConfigType& config) {
         auto [iter, new_shader] = shaders.emplace(config, OGLShaderStage{separable});
         OGLShaderStage& cached_shader = iter->second;
         std::optional<ShaderDecompiler::ProgramResult> result{};
@@ -250,8 +257,7 @@ template <typename KeyConfigType,
 class ShaderDoubleCache {
 public:
     explicit ShaderDoubleCache(bool separable) : separable(separable) {}
-    std::tuple<GLuint, std::optional<ShaderDecompiler::ProgramResult>> Get(
-        const KeyConfigType& key, const Pica::Shader::ShaderSetup& setup) {
+    CachedShader Get(const KeyConfigType& key, const Pica::Shader::ShaderSetup& setup) {
         std::optional<ShaderDecompiler::ProgramResult> result{};
         auto map_it = shader_map.find(key);
         if (map_it == shader_map.end()) {
@@ -563,15 +569,15 @@ void ShaderProgramManager::LoadDiskCache(const std::atomic_bool& stop_loading,
                 // lock access to the shared cache
                 auto [conf, setup] = BuildVSConfigFromRaw(raw);
                 std::scoped_lock lock(mutex);
-                auto [h, r] = impl->programmable_vertex_shaders.Get(conf, setup);
-                handle = h;
-                result = r;
+                auto cached = impl->programmable_vertex_shaders.Get(conf, setup);
+                handle = cached.handle;
+                result = cached.shader;
             } else if (raw.GetProgramType() == ProgramType::FS) {
                 PicaFSConfig conf = PicaFSConfig::BuildFromRegs(raw.GetRawShaderConfig());
                 std::scoped_lock lock(mutex);
-                auto [h, r] = impl->fragment_shaders.Get(conf);
-                handle = h;
-                result = r;
+                auto cached = impl->fragment_shaders.Get(conf);
+                handle = cached.handle;
+                result = cached.shader;
             } else {
                 // Unsupported shader type got stored somehow so nuke the cache
                 LOG_ERROR(Frontend, "failed to load raw programtype {}",
@@ -608,5 +614,32 @@ void ShaderProgramManager::LoadDiskCache(const std::atomic_bool& stop_loading,
         disk_cache.SaveVirtualPrecompiledFile();
     }
 }
+
+class ShaderCompileThread {
+public:
+    ShaderCompileThread(ProgrammableVertexShaders& vs, std::mutex& vs_mutex, FragmentShaders& fs,
+                        std::mutex& fs_mutex)
+        : vs_cache(vs), vs_mutex(vs_mutex), fs_cache(fs), fs_mutex(fs_mutex) {
+        worker = std::thread([&] {
+            while (running) {
+            }
+        });
+    }
+
+    ~ShaderCompileThread() {}
+
+    void CompileVS() {}
+
+private:
+    Common::SPSCQueue<> commands;
+    std::atomic<bool> running = true;
+    std::thread worker;
+
+    std::mutex& vs_mutex;
+    ProgrammableVertexShaders& vs_cache;
+
+    std::mutex& fs_mutex;
+    FragmentShaders& fs_cache;
+};
 
 } // namespace OpenGL
