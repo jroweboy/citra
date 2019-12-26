@@ -1,4 +1,4 @@
-// Copyright 2015 Citra Emulator Project
+﻿// Copyright 2015 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
@@ -205,6 +205,14 @@ struct ShaderSetup {
         /// Used by the JIT, points to a compiled shader object.
         const void* cached_shader = nullptr;
     } engine_data;
+
+    bool IsProgramCodeDirty() const {
+        return program_code_hash_dirty;
+    }
+
+    bool IsSwizzleDataDirty() const {
+        return swizzle_data_hash_dirty;
+    }
 
     void MarkProgramCodeDirty() {
         program_code_hash_dirty = true;

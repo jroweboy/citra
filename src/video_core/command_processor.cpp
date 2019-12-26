@@ -1,4 +1,4 @@
-// Copyright 2014 Citra Emulator Project
+﻿// Copyright 2014 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
@@ -465,6 +465,9 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
         if (offset >= 4096) {
             LOG_ERROR(HW_GPU, "Invalid GS program offset {}", offset);
         } else {
+            if (!g_state.gs.IsProgramCodeDirty()) {
+                g_state.gs.program_code.fill(0);
+            }
             g_state.gs.program_code[offset] = value;
             g_state.gs.MarkProgramCodeDirty();
             offset++;
@@ -484,6 +487,9 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
         if (offset >= g_state.gs.swizzle_data.size()) {
             LOG_ERROR(HW_GPU, "Invalid GS swizzle pattern offset {}", offset);
         } else {
+            if (!g_state.gs.IsSwizzleDataDirty()) {
+                g_state.gs.swizzle_data.fill(0);
+            }
             g_state.gs.swizzle_data[offset] = value;
             g_state.gs.MarkSwizzleDataDirty();
             offset++;
@@ -534,9 +540,18 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
         if (offset >= 512) {
             LOG_ERROR(HW_GPU, "Invalid VS program offset {}", offset);
         } else {
+            // WARNING: The console does NOT clear the previous program_code state on register
+            // write, but its very unlikely that a game relies on previous shader register state for
+            // their next shader invocation. By clearing the state here, we can
+            if (!g_state.vs.IsProgramCodeDirty()) {
+                g_state.vs.program_code.fill(0);
+            }
             g_state.vs.program_code[offset] = value;
             g_state.vs.MarkProgramCodeDirty();
             if (!g_state.regs.pipeline.gs_unit_exclusive_configuration) {
+                if (!g_state.gs.IsProgramCodeDirty()) {
+                    g_state.gs.program_code.fill(0);
+                }
                 g_state.gs.program_code[offset] = value;
                 g_state.gs.MarkProgramCodeDirty();
             }
@@ -557,9 +572,15 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
         if (offset >= g_state.vs.swizzle_data.size()) {
             LOG_ERROR(HW_GPU, "Invalid VS swizzle pattern offset {}", offset);
         } else {
+            if (!g_state.vs.IsSwizzleDataDirty()) {
+                g_state.vs.swizzle_data.fill(0);
+            }
             g_state.vs.swizzle_data[offset] = value;
             g_state.vs.MarkSwizzleDataDirty();
             if (!g_state.regs.pipeline.gs_unit_exclusive_configuration) {
+                if (!g_state.gs.IsSwizzleDataDirty()) {
+                    g_state.gs.swizzle_data.fill(0);
+                }
                 g_state.gs.swizzle_data[offset] = value;
                 g_state.gs.MarkSwizzleDataDirty();
             }

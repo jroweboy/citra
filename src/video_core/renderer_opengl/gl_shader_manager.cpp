@@ -1,4 +1,4 @@
-// Copyright 2018 Citra Emulator Project
+﻿// Copyright 2018 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
@@ -183,6 +183,10 @@ public:
             OGLShaderStage& cached_shader = iter->second;
             if (new_shader) {
                 cached_shader.Create(program.c_str(), ShaderType);
+            } else {
+                LOG_CRITICAL(
+                    Render_OpenGL,
+                    "Shader decompiled code cache was used when it shouldn't happen anymore!");
             }
             shader_map[key] = &cached_shader;
             return cached_shader.GetHandle();
