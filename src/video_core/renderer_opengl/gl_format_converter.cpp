@@ -1,4 +1,4 @@
-#include <map>
+﻿#include <map>
 #include <vector>
 #include "common/assert.h"
 #include "common/scope_exit.h"
@@ -7,6 +7,14 @@
 #include "video_core/renderer_opengl/gl_vars.h"
 
 namespace OpenGL {
+
+constexpr std::size_t FormatToIndex(const PixelFormat& src, const PixelFormat& dst) {
+    AvailableConverters f(AvailableConverters::Unavailable);
+    if (src == PixelFormat::D24S8 && dst == PixelFormat::RGBA8) {
+        f = AvailableConverters::D24S8_ABGR8;
+    }
+    return static_cast<std::size_t>(f);
+}
 
 class FormatConverterBase {
 public:
