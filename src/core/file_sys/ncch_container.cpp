@@ -1,13 +1,12 @@
-// Copyright 2017 Citra Emulator Project
+﻿// Copyright 2017 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
 #include <cinttypes>
 #include <cstring>
 #include <memory>
-#include <cryptopp/aes.h>
-#include <cryptopp/modes.h>
-#include <cryptopp/sha.h>
+#include <mbedtls/aes.h>
+#include <mbedtls/sha256.h>
 #include "common/common_types.h"
 #include "common/logging/log.h"
 #include "core/core.h"
@@ -225,9 +224,13 @@ Loader::ResultStatus NCCHContainer::Load() {
                         std::array<u8, 32> input;
                         std::memcpy(input.data(), key_y_primary.data(), key_y_primary.size());
                         std::memcpy(input.data() + key_y_primary.size(), seed.data(), seed.size());
-                        CryptoPP::SHA256 sha;
-                        std::array<u8, CryptoPP::SHA256::DIGESTSIZE> hash;
-                        sha.CalculateDigest(hash.data(), input.data(), input.size());
+
+                        mbedtls_sha256_context sha{};
+                        mbedtls_sha256_init(&sha);
+                        mbedtls_sha256_starts_ret(&sha, false);
+                        std::array<u8, 32> hash; // 32 is SHA digest size
+                        mbedtls_sha256_update_ret(&sha, input.data(), input.size());
+                        mbedtls_sha256_finish_ret(&sha, hash.data());
                         std::memcpy(key_y_secondary.data(), hash.data(), key_y_secondary.size());
                     }
                 }
@@ -342,6 +345,10 @@ Loader::ResultStatus NCCHContainer::Load() {
                         LOG_ERROR(Service_FS, "Failed to decrypt");
                         return Loader::ResultStatus::ErrorEncrypted;
                     }
+                    mbedtls_aes_context ctx{};
+                    mbedtls_aes_init(&ctx);
+                    // setkey takes a number of keybits not bytes
+                    mbedtls_aes_setkey_enc(&ctx, primary_key.data(), primary_key.size() * 8);
                     CryptoPP::byte* data = reinterpret_cast<CryptoPP::byte*>(&exheader_header);
                     CryptoPP::CTR_Mode<CryptoPP::AES>::Decryption(
                         primary_key.data(), primary_key.size(), exheader_ctr.data())

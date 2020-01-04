@@ -407,6 +407,8 @@ add_library(core STATIC
     hle/service/y2r_u.h
     hw/aes/arithmetic128.cpp
     hw/aes/arithmetic128.h
+    hw/aes/3ds_ccm.cpp
+    hw/aes/3ds_ccm.h
     hw/aes/ccm.cpp
     hw/aes/ccm.h
     hw/aes/key.cpp
@@ -463,7 +465,7 @@ endif()
 create_target_directory_groups(core)
 
 target_link_libraries(core PUBLIC common PRIVATE audio_core network video_core)
-target_link_libraries(core PUBLIC Boost::boost PRIVATE cryptopp fmt open_source_archives)
+target_link_libraries(core PUBLIC Boost::boost PRIVATE mbedtls fmt open_source_archives)
 if (ENABLE_WEB_SERVICE)
     target_compile_definitions(core PRIVATE -DENABLE_WEB_SERVICE)
     target_link_libraries(core PRIVATE web_service)

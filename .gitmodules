@@ -16,9 +16,6 @@
 [submodule "xbyak"]
     path = externals/xbyak
     url = https://github.com/herumi/xbyak.git
-[submodule "cryptopp"]
-    path = externals/cryptopp/cryptopp
-    url = https://github.com/weidai11/cryptopp.git
 [submodule "fmt"]
     path = externals/fmt
     url = https://github.com/fmtlib/fmt.git
@@ -46,3 +43,6 @@
 [submodule "lodepng"]
     path = externals/lodepng/lodepng
     url = https://github.com/lvandeve/lodepng.git
+[submodule "mbedtls"]
+    path = externals/mbedtls
+    url = https://github.com/ARMmbed/mbedtls

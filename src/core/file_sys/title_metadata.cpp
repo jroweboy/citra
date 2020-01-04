@@ -1,9 +1,9 @@
-// Copyright 2017 Citra Emulator Project
+﻿// Copyright 2017 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
 #include <cinttypes>
-#include <cryptopp/sha.h>
+#include <mbedtls/sha256.h>
 #include "common/alignment.h"
 #include "common/file_util.h"
 #include "common/logging/log.h"
@@ -108,17 +108,24 @@ Loader::ResultStatus TitleMetadata::Save(const std::string& file_path) {
     tmd_body.contentinfo[0].index = 0;
     tmd_body.contentinfo[0].command_count = static_cast<u16>(tmd_chunks.size());
 
-    CryptoPP::SHA256 chunk_hash;
+    mbedtls_sha256_context chunk_hash{};
+    mbedtls_sha256_init(&chunk_hash);
+    mbedtls_sha256_starts_ret(&chunk_hash, false);
     for (u16 i = 0; i < tmd_body.content_count; i++) {
-        chunk_hash.Update(reinterpret_cast<u8*>(&tmd_chunks[i]), sizeof(ContentChunk));
+        mbedtls_sha256_update_ret(&chunk_hash, reinterpret_cast<u8*>(&tmd_chunks[i]),
+                                  sizeof(ContentChunk));
     }
-    chunk_hash.Final(tmd_body.contentinfo[0].hash.data());
+    mbedtls_sha256_finish_ret(&chunk_hash, tmd_body.contentinfo[0].hash.data());
 
-    CryptoPP::SHA256 contentinfo_hash;
+    mbedtls_sha256_context contentinfo_hash{};
+    mbedtls_sha256_init(&contentinfo_hash);
+    mbedtls_sha256_starts_ret(&contentinfo_hash, false);
     for (std::size_t i = 0; i < tmd_body.contentinfo.size(); i++) {
-        chunk_hash.Update(reinterpret_cast<u8*>(&tmd_body.contentinfo[i]), sizeof(ContentInfo));
+        mbedtls_sha256_update_ret(&contentinfo_hash,
+                                  reinterpret_cast<u8*>(&tmd_body.contentinfo[i]),
+                                  sizeof(ContentInfo));
     }
-    chunk_hash.Final(tmd_body.contentinfo_hash.data());
+    mbedtls_sha256_finish_ret(&contentinfo_hash, tmd_body.contentinfo_hash.data());
 
     // Write our TMD body, then write each of our ContentChunks
     if (file.WriteBytes(&tmd_body, sizeof(TitleMetadata::Body)) != sizeof(TitleMetadata::Body))

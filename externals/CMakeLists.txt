@@ -8,9 +8,6 @@ include(ExternalProject)
 add_library(catch-single-include INTERFACE)
 target_include_directories(catch-single-include INTERFACE catch/single_include)
 
-# Crypto++
-add_subdirectory(cryptopp)
-
 # Dynarmic
 if (ARCHITECTURE_x86_64)
     # Dynarmic will skip defining xbyak if it's already defined, we then define it below
@@ -50,6 +47,10 @@ add_subdirectory(open_source_archives)
 add_subdirectory(soundtouch)
 # The SoundTouch target doesn't export the necessary include paths as properties by default
 target_include_directories(SoundTouch INTERFACE ./soundtouch/include)
+
+# Mbed TLS
+add_subdirectory(mbedtls EXCLUDE_FROM_ALL)
+target_include_directories(mbedtls PUBLIC ./mbedtls/include)
 
 # Teakra
 add_subdirectory(teakra)
