@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 #pragma once
+
 #include <array>
 #include <glad/glad.h>
 #include "common/common_types.h"
@@ -41,8 +42,8 @@ enum class PixelFormat {
 
 class FormatConverterBase;
 
-enum class AvailableConverters {
-    D24S8_ABGR8,
+enum class AvailableConverters : std::size_t {
+    ReadPixel_D24S8_ABGR8,
     Count,
     Unavailable,
 };
@@ -59,7 +60,9 @@ public:
                  const Common::Rectangle<u32>& dst_rect, GLuint draw_fb_handle);
 
 private:
-    std::array<std::unique_ptr<FormatConverterBase>, AvailableConverters::Count> converters;
+    std::array<std::unique_ptr<FormatConverterBase>,
+               static_cast<std::size_t>(AvailableConverters::Count)>
+        converters{};
 };
 
 } // namespace OpenGL
