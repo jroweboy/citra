@@ -12,14 +12,6 @@
 
 namespace OpenGL {
 
-constexpr std::size_t FormatToIndex(const PixelFormat& src, const PixelFormat& dst) {
-    AvailableConverters f(AvailableConverters::Unavailable);
-    if (src == PixelFormat::D24S8 && dst == PixelFormat::RGBA8) {
-        f = AvailableConverters::ReadPixel_D24S8_ABGR8;
-    }
-    return static_cast<std::size_t>(f);
-}
-
 class FormatConverterBase {
 public:
     virtual ~FormatConverterBase() = default;
@@ -28,9 +20,9 @@ public:
                          const Common::Rectangle<u32>& dst_rect, GLuint draw_fb_handle) = 0;
 };
 
-class ConverterD24S8toABGR final : public FormatConverterBase {
+class ReadPixel final : public FormatConverterBase {
 public:
-    ConverterD24S8toABGR() {
+    ReadPixel() {
         attributeless_vao.Create();
         d24s8_abgr_buffer.Create();
         d24s8_abgr_buffer_size = 0;
@@ -76,7 +68,7 @@ void main() {
         ASSERT(d24s8_abgr_viewport_u_id != -1);
     }
 
-    ~ConverterD24S8toABGR() {}
+    ~ReadPixel() {}
 
     void Convert(GLuint src_tex, const Common::Rectangle<u32>& src_rect, GLuint read_fb_handle,
                  GLuint dst_tex, const Common::Rectangle<u32>& dst_rect,
@@ -148,9 +140,76 @@ private:
     GLint d24s8_abgr_viewport_u_id;
 };
 
+class FastStencil : public FormatConverterBase {
+public:
+    FastStencil() {
+
+        std::string vs_source = R"(
+const vec2 vertices[4] = vec2[4](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0));
+void main() {
+    gl_Position = vec4(vertices[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+        std::string fs_source = GLES ? fragment_shader_precision_OES : "";
+        fs_source += R"(
+
+layout (binding=0) uniform sampler2D depth_tex;
+layout (binding=1) uniform usampler2D stencil_tex;
+
+layout (location = 1) out vec4 color;
+in vec2 uv;
+
+void main (void) {
+    float depth = texture(depth_tex, uv);
+    uint stencil = texture(stencil_tex, uv);
+
+    // Expand depth into a 24 bit value and place the values into the agb
+    depth *= 16777216.0;
+    vec3 agb;
+    agb.x = floor(depth / (256.0 * 256.0));
+    depth -= agb.x * 256.0 * 256.0;
+    agb.y = floor(depth / 256.0);
+    depth -= agb.y * 256.0;
+    agb.z = depth;
+
+    color.a = agb.x / 255.0;
+    color.b = agb.y / 255.0;
+    color.g = agb.z / 255.0;
+    color.r = stencil / 255.0;
+}
+)";
+        ds_shader.Create(vs_source.c_str(), fs_source.c_str());
+
+        ds_depth_uid = glGetUniformLocation(ds_shader.handle, "depth_tex");
+        ASSERT(ds_depth_uid != -1);
+        ds_stencil_uid = glGetUniformLocation(ds_shader.handle, "stencil_tex");
+        ASSERT(ds_stencil_uid != -1);
+    }
+
+    ~FastStencil() {}
+
+    void Convert(GLuint src_tex, const Common::Rectangle<u32>& src_rect, GLuint read_fb_handle,
+                 GLuint dst_tex, const Common::Rectangle<u32>& dst_rect,
+                 GLuint draw_fb_handle) override {
+        OpenGLState prev_state = OpenGLState::GetCurState();
+        SCOPE_EXIT({ prev_state.Apply(); });
+    }
+
+private:
+    OGLProgram ds_shader;
+    GLint ds_depth_uid;
+    GLint ds_stencil_uid;
+};
+
 FormatConverterOpenGL::FormatConverterOpenGL() {
-    converters[static_cast<std::size_t>(AvailableConverters::ReadPixel_D24S8_ABGR8)] =
-        std::make_unique<ConverterD24S8toABGR>();
+    converters[static_cast<std::size_t>(AvailableConverters::ReadPixel)] =
+        std::make_unique<ReadPixel>();
+    has_stencil_texture = GL_ARB_stencil_texturing && GL_ARB_texture_view;
+    if (has_stencil_texture) {
+        converters[static_cast<std::size_t>(AvailableConverters::FastStencil)] =
+            std::make_unique<FastStencil>();
+    }
 }
 
 FormatConverterOpenGL::~FormatConverterOpenGL() = default;
@@ -171,13 +230,23 @@ bool FormatConverterOpenGL::Convert(PixelFormat src_format, GLuint src_tex,
                                     const Common::Rectangle<u32>& src_rect, GLuint read_fb_handle,
                                     PixelFormat dst_format, GLuint dst_tex,
                                     const Common::Rectangle<u32>& dst_rect, GLuint draw_fb_handle) {
-    auto index = FormatToIndex(src_format, dst_format);
-    if (static_cast<AvailableConverters>(index) == AvailableConverters::Unavailable) {
+    auto& converter = GetConverter(src_format, dst_format);
+    if (!converter) {
         return false;
     }
-    auto& converter = converters[index];
     converter->Convert(src_tex, src_rect, read_fb_handle, dst_tex, dst_rect, draw_fb_handle);
     return true;
+}
+
+const std::unique_ptr<FormatConverterBase>& FormatConverterOpenGL::GetConverter(
+    PixelFormat src, PixelFormat dst) const {
+    if (src == PixelFormat::D24S8 && dst == PixelFormat::RGBA8) {
+        if (has_stencil_texture) {
+            return converters[static_cast<std::size_t>(AvailableConverters::FastStencil)];
+        }
+        return converters[static_cast<std::size_t>(AvailableConverters::ReadPixel)];
+    }
+    return nullptr;
 }
 
 } // namespace OpenGL

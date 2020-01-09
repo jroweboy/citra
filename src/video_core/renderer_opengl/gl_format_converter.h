@@ -43,7 +43,8 @@ enum class PixelFormat {
 class FormatConverterBase;
 
 enum class AvailableConverters : std::size_t {
-    ReadPixel_D24S8_ABGR8,
+    ReadPixel,
+    FastStencil,
     Count,
     Unavailable,
 };
@@ -60,6 +61,11 @@ public:
                  const Common::Rectangle<u32>& dst_rect, GLuint draw_fb_handle);
 
 private:
+    bool has_stencil_texture = false;
+
+    const std::unique_ptr<FormatConverterBase>& GetConverter(PixelFormat src,
+                                                             PixelFormat dst) const;
+
     std::array<std::unique_ptr<FormatConverterBase>,
                static_cast<std::size_t>(AvailableConverters::Count)>
         converters{};
