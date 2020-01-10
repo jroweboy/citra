@@ -7,6 +7,7 @@
 #include "common/assert.h"
 #include "common/scope_exit.h"
 #include "video_core/renderer_opengl/gl_format_converter.h"
+#include "video_core/renderer_opengl/gl_resource_manager.h"
 #include "video_core/renderer_opengl/gl_state.h"
 #include "video_core/renderer_opengl/gl_vars.h"
 
@@ -143,9 +144,9 @@ private:
 class FastStencil : public FormatConverterBase {
 public:
     FastStencil() {
-
         std::string vs_source = R"(
 const vec2 vertices[4] = vec2[4](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0));
+
 void main() {
     gl_Position = vec4(vertices[gl_VertexID], 0.0, 1.0);
 }
@@ -153,38 +154,40 @@ void main() {
 
         std::string fs_source = GLES ? fragment_shader_precision_OES : "";
         fs_source += R"(
+uniform sampler2D depth_tex;
+uniform usampler2D stencil_tex;
+uniform vec4 viewport;
 
-layout (binding=0) uniform sampler2D depth_tex;
-layout (binding=1) uniform usampler2D stencil_tex;
-
-layout (location = 1) out vec4 color;
-in vec2 uv;
+out vec4 color;
 
 void main (void) {
-    float depth = texture(depth_tex, uv);
-    uint stencil = texture(stencil_tex, uv);
+    float depth = texture(depth_tex, (gl_FragCoord.xy - viewport.xy)).r;
+    uint stencil = texture(stencil_tex, (gl_FragCoord.xy - viewport.xy)).r;
 
     // Expand depth into a 24 bit value and place the values into the agb
     depth *= 16777216.0;
-    vec3 agb;
-    agb.x = floor(depth / (256.0 * 256.0));
-    depth -= agb.x * 256.0 * 256.0;
-    agb.y = floor(depth / 256.0);
-    depth -= agb.y * 256.0;
-    agb.z = depth;
+    vec3 rgb;
+    rgb.b = floor(depth / (256.0 * 256.0));
+    depth -= rgb.b * 256.0 * 256.0;
+    rgb.g = floor(depth / 256.0);
+    depth -= rgb.g * 256.0;
+    rgb.r = depth;
 
-    color.a = agb.x / 255.0;
-    color.b = agb.y / 255.0;
-    color.g = agb.z / 255.0;
-    color.r = stencil / 255.0;
+    color.r = rgb.r / 255.0;
+    color.g = rgb.g / 255.0;
+    color.b = rgb.b / 255.0;
+    color.a = float(stencil) / 255.0;
 }
 )";
         ds_shader.Create(vs_source.c_str(), fs_source.c_str());
+        attributeless_vao.Create();
 
         ds_depth_uid = glGetUniformLocation(ds_shader.handle, "depth_tex");
         ASSERT(ds_depth_uid != -1);
         ds_stencil_uid = glGetUniformLocation(ds_shader.handle, "stencil_tex");
         ASSERT(ds_stencil_uid != -1);
+        ds_viewport_uid = glGetUniformLocation(ds_shader.handle, "viewport");
+        ASSERT(ds_viewport_uid != -1);
     }
 
     ~FastStencil() {}
@@ -194,12 +197,52 @@ void main (void) {
                  GLuint draw_fb_handle) override {
         OpenGLState prev_state = OpenGLState::GetCurState();
         SCOPE_EXIT({ prev_state.Apply(); });
+
+        OpenGLState state;
+        state.draw.read_framebuffer = read_fb_handle;
+        state.draw.draw_framebuffer = draw_fb_handle;
+        state.draw.shader_program = ds_shader.handle;
+        state.draw.vertex_array = attributeless_vao.handle;
+        state.viewport.x = static_cast<GLint>(dst_rect.left);
+        state.viewport.y = static_cast<GLint>(dst_rect.bottom);
+        state.viewport.width = static_cast<GLsizei>(dst_rect.GetWidth());
+        state.viewport.height = static_cast<GLsizei>(dst_rect.GetHeight());
+        state.Apply();
+
+        // Create texture view so we can attach the stencil as well
+        OGLTexture stencil_view;
+        stencil_view.Create();
+        glTextureView(stencil_view.handle, GL_TEXTURE_2D, src_tex, GL_DEPTH24_STENCIL8, 0, 1, 0, 1);
+        glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+
+        state.texture_units[0].texture_2d = src_tex;
+        state.texture_units[1].texture_2d = stencil_view.handle;
+        state.Apply();
+        // Give this depth buffer the depth/stencil attribute to sample depth
+        glActiveTexture(GL_TEXTURE0);
+        glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dst_tex,
+                               0);
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, 0,
+                               0);
+
+        glUniform1i(ds_depth_uid, 0);
+        glUniform1i(ds_stencil_uid, 1);
+        glUniform4f(ds_viewport_uid, static_cast<GLfloat>(state.viewport.x),
+                    static_cast<GLfloat>(state.viewport.y),
+                    static_cast<GLfloat>(state.viewport.width),
+                    static_cast<GLfloat>(state.viewport.height));
+
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
 private:
     OGLProgram ds_shader;
+    OGLVertexArray attributeless_vao;
     GLint ds_depth_uid;
     GLint ds_stencil_uid;
+    GLint ds_viewport_uid;
 };
 
 FormatConverterOpenGL::FormatConverterOpenGL() {

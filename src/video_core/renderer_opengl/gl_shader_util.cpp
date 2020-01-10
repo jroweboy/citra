@@ -1,4 +1,4 @@
-// Copyright 2014 Citra Emulator Project
+﻿// Copyright 2014 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
@@ -14,7 +14,7 @@
 namespace OpenGL {
 
 GLuint LoadShader(const char* source, GLenum type) {
-    const std::string version = GLES ? R"(#version 310 es
+    std::string version = GLES ? R"(#version 310 es
 
 #define CITRA_GLES
 
@@ -26,7 +26,7 @@ GLuint LoadShader(const char* source, GLenum type) {
 #extension GL_EXT_clip_cull_distance : enable
 #endif // defined(GL_EXT_clip_cull_distance)
 )"
-                                     : "#version 330\n";
+                               : "#version 330\n";
 
     const char* debug_type;
     switch (type) {
