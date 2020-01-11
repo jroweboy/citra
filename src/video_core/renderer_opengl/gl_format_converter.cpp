@@ -1,4 +1,4 @@
-// Copyright 2019 Citra Emulator Project
+﻿// Copyright 2019 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
@@ -160,10 +160,32 @@ uniform vec4 viewport;
 
 out vec4 color;
 
-void main (void) {
-    float depth = texture(depth_tex, (gl_FragCoord.xy - viewport.xy)).r;
-    uint stencil = texture(stencil_tex, (gl_FragCoord.xy - viewport.xy)).r;
+// Credit to https://skytiger.wordpress.com/2010/12/01/packing-depth-into-color/
+vec3 UnitToColor24(float depth) {
+    // Constants
+    vec3 scale = vec3(1.0, 256.0, 65536.0);
+    vec2 ogb = vec2(65536.0, 256.0) / 16777215.0;
+    float normal = 256.0 / 255.0;
 
+    // Avoid Precision Errors
+    vec3 unit = vec3(depth, depth, depth);
+    unit.gb -= floor(unit.gb / ogb) * ogb;
+
+    // Scale Up
+    vec3 retval = unit * scale;
+
+    // Use Fraction to emulate Modulo
+    retval = fract(retval);
+
+    // Normalize Range
+    retval *= normal;
+
+    // Mask Noise
+    retval.rg -= retval.gb / 256.0;
+    return retval;
+}
+
+vec3 OldFloatTo24(float depth) {
     // Expand depth into a 24 bit value and place the values into the agb
     depth *= 16777216.0;
     vec3 rgb;
@@ -172,11 +194,18 @@ void main (void) {
     rgb.g = floor(depth / 256.0);
     depth -= rgb.g * 256.0;
     rgb.r = depth;
+    return rgb;
+}
 
-    color.r = rgb.r / 255.0;
-    color.g = rgb.g / 255.0;
-    color.b = rgb.b / 255.0;
-    color.a = float(stencil) / 255.0;
+void main (void) {
+    vec2 coords = vec2((gl_FragCoord.x - viewport.x) / (viewport.w), (gl_FragCoord.y - viewport.y) / (viewport.z));
+    float depth = texture(depth_tex, coords).r;
+    uint stencil = texture(stencil_tex, coords).r;
+
+    //vec3 depth_rgb = UnitToColor24(depth);
+    vec3 depth_rgb = OldFloatTo24(depth);
+    color.rab = depth_rgb;
+    color.g = float(stencil) / 255.0;
 }
 )";
         ds_shader.Create(vs_source.c_str(), fs_source.c_str());
@@ -212,6 +241,8 @@ void main (void) {
         // Create texture view so we can attach the stencil as well
         OGLTexture stencil_view;
         stencil_view.Create();
+        glActiveTexture(GL_TEXTURE0 + 1);
+        glBindTexture(GL_TEXTURE_2D, stencil_view.handle);
         glTextureView(stencil_view.handle, GL_TEXTURE_2D, src_tex, GL_DEPTH24_STENCIL8, 0, 1, 0, 1);
         glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
 
@@ -229,10 +260,10 @@ void main (void) {
 
         glUniform1i(ds_depth_uid, 0);
         glUniform1i(ds_stencil_uid, 1);
-        glUniform4f(ds_viewport_uid, static_cast<GLfloat>(state.viewport.x),
-                    static_cast<GLfloat>(state.viewport.y),
-                    static_cast<GLfloat>(state.viewport.width),
-                    static_cast<GLfloat>(state.viewport.height));
+        glUniform4f(ds_viewport_uid, static_cast<GLfloat>(src_rect.left),
+                    static_cast<GLfloat>(src_rect.bottom),
+                    static_cast<GLfloat>(src_rect.GetWidth()),
+                    static_cast<GLfloat>(src_rect.GetHeight()));
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
