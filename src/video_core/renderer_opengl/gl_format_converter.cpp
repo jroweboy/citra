@@ -156,34 +156,8 @@ void main() {
         fs_source += R"(
 uniform sampler2D depth_tex;
 uniform usampler2D stencil_tex;
-uniform vec4 viewport;
 
 out vec4 color;
-
-// Credit to https://skytiger.wordpress.com/2010/12/01/packing-depth-into-color/
-vec3 UnitToColor24(float depth) {
-    // Constants
-    vec3 scale = vec3(1.0, 256.0, 65536.0);
-    vec2 ogb = vec2(65536.0, 256.0) / 16777215.0;
-    float normal = 256.0 / 255.0;
-
-    // Avoid Precision Errors
-    vec3 unit = vec3(depth, depth, depth);
-    unit.gb -= floor(unit.gb / ogb) * ogb;
-
-    // Scale Up
-    vec3 retval = unit * scale;
-
-    // Use Fraction to emulate Modulo
-    retval = fract(retval);
-
-    // Normalize Range
-    retval *= normal;
-
-    // Mask Noise
-    retval.rg -= retval.gb / 256.0;
-    return retval;
-}
 
 vec3 OldFloatTo24(float depth) {
     // Expand depth into a 24 bit value and place the values into the agb
@@ -198,14 +172,15 @@ vec3 OldFloatTo24(float depth) {
 }
 
 void main (void) {
-    vec2 coords = vec2((gl_FragCoord.x - viewport.x) / (viewport.w), (gl_FragCoord.y - viewport.y) / (viewport.z));
+    vec2 sz = vec2(textureSize(depth_tex, 0));
+    vec2 coords = gl_FragCoord.xy / sz;
     float depth = texture(depth_tex, coords).r;
     uint stencil = texture(stencil_tex, coords).r;
 
     //vec3 depth_rgb = UnitToColor24(depth);
     vec3 depth_rgb = OldFloatTo24(depth);
-    color.rab = depth_rgb;
-    color.g = float(stencil) / 255.0;
+    color.gba = depth_rgb;
+    color.r = float(stencil) / 255.0;
 }
 )";
         ds_shader.Create(vs_source.c_str(), fs_source.c_str());
@@ -215,8 +190,6 @@ void main (void) {
         ASSERT(ds_depth_uid != -1);
         ds_stencil_uid = glGetUniformLocation(ds_shader.handle, "stencil_tex");
         ASSERT(ds_stencil_uid != -1);
-        ds_viewport_uid = glGetUniformLocation(ds_shader.handle, "viewport");
-        ASSERT(ds_viewport_uid != -1);
     }
 
     ~FastStencil() {}
@@ -238,20 +211,22 @@ void main (void) {
         state.viewport.height = static_cast<GLsizei>(dst_rect.GetHeight());
         state.Apply();
 
-        // Create texture view so we can attach the stencil as well
         OGLTexture stencil_view;
         stencil_view.Create();
-        glActiveTexture(GL_TEXTURE0 + 1);
-        glBindTexture(GL_TEXTURE_2D, stencil_view.handle);
         glTextureView(stencil_view.handle, GL_TEXTURE_2D, src_tex, GL_DEPTH24_STENCIL8, 0, 1, 0, 1);
-        glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
 
-        state.texture_units[0].texture_2d = src_tex;
-        state.texture_units[1].texture_2d = stencil_view.handle;
-        state.Apply();
-        // Give this depth buffer the depth/stencil attribute to sample depth
+        // state.texture_units[0].texture_2d = src_tex;
+        // state.Apply();
         glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, src_tex);
         glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+
+        // Create texture view so we can attach the stencil as well
+        // state.texture_units[1].texture_2d = stencil_view.handle;
+        // state.Apply();
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, stencil_view.handle);
+        glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dst_tex,
                                0);
@@ -260,12 +235,13 @@ void main (void) {
 
         glUniform1i(ds_depth_uid, 0);
         glUniform1i(ds_stencil_uid, 1);
-        glUniform4f(ds_viewport_uid, static_cast<GLfloat>(src_rect.left),
-                    static_cast<GLfloat>(src_rect.bottom),
-                    static_cast<GLfloat>(src_rect.GetWidth()),
-                    static_cast<GLfloat>(src_rect.GetHeight()));
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
 private:
@@ -273,7 +249,6 @@ private:
     OGLVertexArray attributeless_vao;
     GLint ds_depth_uid;
     GLint ds_stencil_uid;
-    GLint ds_viewport_uid;
 };
 
 FormatConverterOpenGL::FormatConverterOpenGL() {
@@ -315,9 +290,9 @@ bool FormatConverterOpenGL::Convert(PixelFormat src_format, GLuint src_tex,
 const std::unique_ptr<FormatConverterBase>& FormatConverterOpenGL::GetConverter(
     PixelFormat src, PixelFormat dst) const {
     if (src == PixelFormat::D24S8 && dst == PixelFormat::RGBA8) {
-        if (has_stencil_texture) {
-            return converters[static_cast<std::size_t>(AvailableConverters::FastStencil)];
-        }
+        // if (has_stencil_texture) {
+        //    return converters[static_cast<std::size_t>(AvailableConverters::FastStencil)];
+        // }
         return converters[static_cast<std::size_t>(AvailableConverters::ReadPixel)];
     }
     return nullptr;
