@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <array>
+#include <chrono>
 #include <memory>
 #include <tuple>
 #include <utility>
@@ -24,14 +26,15 @@ public:
     virtual ~TextureMailbox() = default;
 
     /**
-     * Recreate the render objects attached to this frame with the new specified width/height
+     * Recreate the render objects attached to this frame with the new specified width/height for
+     * each guest screen (calculated from res_scale)
      */
-    virtual void ReloadRenderFrame(Frontend::Frame* frame, u32 width, u32 height) = 0;
+    virtual void ReloadRenderFrame(Frontend::Frame* frame, u16 res_scale) = 0;
 
     /**
-     * Recreate the presentation objects attached to this frame with the new specified width/height
+     * Recreate the presentation objects attached to this frame
      */
-    virtual void ReloadPresentFrame(Frontend::Frame* frame, u32 width, u32 height) = 0;
+    virtual void ReloadPresentFrame(Frontend::Frame* frame) = 0;
 
     /**
      * Render thread calls this to get an available frame to present
@@ -48,7 +51,7 @@ public:
      * frame available after timeout, returns the previous frame. If there is no previous frame it
      * returns nullptr
      */
-    virtual Frontend::Frame* TryGetPresentFrame(int timeout_ms) = 0;
+    virtual Frontend::Frame* TryGetPresentFrame(std::chrono::milliseconds timeout) = 0;
 };
 
 /**
@@ -161,7 +164,7 @@ public:
      */
     void UpdateCurrentFramebufferLayout(unsigned width, unsigned height);
 
-    std::unique_ptr<TextureMailbox> mailbox = nullptr;
+    std::shared_ptr<TextureMailbox> mailbox = nullptr;
 
 protected:
     EmuWindow();

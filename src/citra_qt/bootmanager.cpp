@@ -103,87 +103,30 @@ void EmuThread::run() {
 #endif
 }
 
-OpenGLWindow::OpenGLWindow(QWindow* parent, QWidget* event_handler, QOpenGLContext* shared_context)
-    : QWindow(parent), event_handler(event_handler),
-      context(new QOpenGLContext(shared_context->parent())) {
-
-    // disable vsync for any shared contexts
-    auto format = shared_context->format();
-    format.setSwapInterval(Settings::values.use_vsync_new ? 1 : 0);
-    this->setFormat(format);
-
-    context->setShareContext(shared_context);
-    context->setScreen(this->screen());
-    context->setFormat(format);
-    context->create();
-
-    setSurfaceType(QWindow::OpenGLSurface);
-
+OpenGLWidget::OpenGLWidget(QWidget* parent) : QOpenGLWidget(parent), event_handler(parent) {
+    connect(this, &QOpenGLWidget::frameSwapped, this, QOverload<>::of(&QWidget::update));
     // TODO: One of these flags might be interesting: WA_OpaquePaintEvent, WA_NoBackground,
     // WA_DontShowOnScreen, WA_DeleteOnClose
 }
 
-OpenGLWindow::~OpenGLWindow() {
-    context->doneCurrent();
+OpenGLWidget::~OpenGLWidget() {}
+
+void OpenGLWidget::initializeGL() {
+    auto* emu_window = reinterpret_cast<GRenderWindow*>(event_handler);
+    present = std::make_unique<Frontend::VideoPresentation>();
+    present->EnableMailbox(emu_window->mailbox);
+    present->Init();
 }
 
-void OpenGLWindow::Present() {
-    if (!isExposed())
-        return;
+void OpenGLWidget::resizeGL(int w, int h) {
+    // TODO: remove framebuffer layout from emu window and make it part of presentation
+}
 
-    context->makeCurrent(this);
-    VideoCore::g_renderer->TryPresent(100);
-    context->swapBuffers(this);
-    auto f = context->versionFunctions<QOpenGLFunctions_3_3_Core>();
+void OpenGLWidget::paintGL() {
+    auto* emu_window = reinterpret_cast<GRenderWindow*>(event_handler);
+    present->Present(emu_window->GetFramebufferLayout());
+    auto f = QOpenGLContext::currentContext()->versionFunctions<QOpenGLFunctions_3_3_Core>();
     f->glFinish();
-    QWindow::requestUpdate();
-}
-
-bool OpenGLWindow::event(QEvent* event) {
-    switch (event->type()) {
-    case QEvent::UpdateRequest:
-        Present();
-        return true;
-    case QEvent::MouseButtonPress:
-    case QEvent::MouseButtonRelease:
-    case QEvent::MouseButtonDblClick:
-    case QEvent::MouseMove:
-    case QEvent::KeyPress:
-    case QEvent::KeyRelease:
-    case QEvent::FocusIn:
-    case QEvent::FocusOut:
-    case QEvent::FocusAboutToChange:
-    case QEvent::Enter:
-    case QEvent::Leave:
-    case QEvent::Wheel:
-    case QEvent::TabletMove:
-    case QEvent::TabletPress:
-    case QEvent::TabletRelease:
-    case QEvent::TabletEnterProximity:
-    case QEvent::TabletLeaveProximity:
-    case QEvent::TouchBegin:
-    case QEvent::TouchUpdate:
-    case QEvent::TouchEnd:
-    case QEvent::InputMethodQuery:
-    case QEvent::TouchCancel:
-        return QCoreApplication::sendEvent(event_handler, event);
-    case QEvent::Drop:
-        GetMainWindow()->DropAction(static_cast<QDropEvent*>(event));
-        return true;
-    case QEvent::DragResponse:
-    case QEvent::DragEnter:
-    case QEvent::DragLeave:
-    case QEvent::DragMove:
-        GetMainWindow()->AcceptDropEvent(static_cast<QDropEvent*>(event));
-        return true;
-    default:
-        return QWindow::event(event);
-    }
-}
-
-void OpenGLWindow::exposeEvent(QExposeEvent* event) {
-    QWindow::requestUpdate();
-    QWindow::exposeEvent(event);
 }
 
 GRenderWindow::GRenderWindow(QWidget* parent_, EmuThread* emu_thread)
@@ -379,12 +322,13 @@ void GRenderWindow::InitRenderTarget() {
 
     GMainWindow* parent = GetMainWindow();
     QWindow* parent_win_handle = parent ? parent->windowHandle() : nullptr;
-    child_window = new OpenGLWindow(parent_win_handle, this, QOpenGLContext::globalShareContext());
-    child_window->create();
-    child_widget = createWindowContainer(child_window, this);
-    child_widget->resize(Core::kScreenTopWidth, Core::kScreenTopHeight + Core::kScreenBottomHeight);
-
-    layout()->addWidget(child_widget);
+    child_window = new OpenGLWidget(this);
+    child_window->resize(Core::kScreenTopWidth, Core::kScreenTopHeight + Core::kScreenBottomHeight);
+    child_window2 = new OpenGLWidget(this);
+    child_window2->resize(Core::kScreenTopWidth,
+                          Core::kScreenTopHeight + Core::kScreenBottomHeight);
+    child_window2->setParent(nullptr);
+    layout()->addWidget(child_window);
 
     core_context = CreateSharedContext();
     resize(Core::kScreenTopWidth, Core::kScreenTopHeight + Core::kScreenBottomHeight);
@@ -393,10 +337,10 @@ void GRenderWindow::InitRenderTarget() {
 }
 
 void GRenderWindow::ReleaseRenderTarget() {
-    if (child_widget) {
-        layout()->removeWidget(child_widget);
-        delete child_widget;
-        child_widget = nullptr;
+    if (child_window) {
+        layout()->removeWidget(child_window);
+        delete child_window;
+        child_window = nullptr;
     }
 }
 
@@ -432,6 +376,7 @@ void GRenderWindow::OnEmulationStopping() {
 
 void GRenderWindow::showEvent(QShowEvent* event) {
     QWidget::showEvent(event);
+    child_window2->show();
 }
 
 std::unique_ptr<Frontend::GraphicsContext> GRenderWindow::CreateSharedContext() const {
@@ -449,10 +394,15 @@ GLContext::GLContext(QOpenGLContext* shared_context)
     context->setShareContext(shared_context);
     context->setFormat(format);
     context->create();
-    surface->setParent(shared_context->parent());
-    surface->setFormat(format);
-    surface->create();
+
+    QOffscreenSurface* surf = static_cast<QOffscreenSurface*>(surface);
+    surf->setParent(shared_context->parent());
+    surf->setFormat(format);
+    surf->create();
 }
+
+GLContext::GLContext(QOpenGLContext* wrap_context, QSurface* wrap_surface)
+    : context(wrap_context), surface(wrap_surface) {}
 
 void GLContext::MakeCurrent() {
     context->makeCurrent(surface);

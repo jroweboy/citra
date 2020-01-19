@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <tuple>
 #include <type_traits>
 
 namespace Common {
@@ -22,6 +23,14 @@ struct Rectangle {
 
     constexpr Rectangle(T left, T top, T right, T bottom)
         : left(left), top(top), right(right), bottom(bottom) {}
+
+    bool operator==(const Rectangle<T>& o) const {
+        return std::tie(left, top, right, bottom) == std::tie(o.left, o.top, o.right, o.bottom);
+    }
+
+    bool operator!=(const Rectangle<T>& o) const {
+        return !(*this == o);
+    }
 
     T GetWidth() const {
         return std::abs(static_cast<std::make_signed_t<T>>(right - left));

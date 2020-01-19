@@ -110,6 +110,7 @@ add_library(core STATIC
     frontend/mic.cpp
     frontend/scope_acquire_context.cpp
     frontend/scope_acquire_context.h
+    frontend/video_presentation.h
     gdbstub/gdbstub.cpp
     gdbstub/gdbstub.h
     hle/applets/applet.cpp

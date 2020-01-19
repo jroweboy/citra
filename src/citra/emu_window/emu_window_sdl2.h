@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 #include "core/frontend/emu_window.h"
+#include "core/frontend/video_presentation.h"
 
 struct SDL_Window;
 
@@ -96,6 +97,9 @@ private:
 
     /// The OpenGL context associated with the core
     std::unique_ptr<Frontend::GraphicsContext> core_context;
+
+    /// Presentation objects for rendering the final presentation frame
+    std::unique_ptr<Frontend::VideoPresentation> present;
 
     /// Keeps track of how often to update the title bar during gameplay
     u32 last_time = 0;

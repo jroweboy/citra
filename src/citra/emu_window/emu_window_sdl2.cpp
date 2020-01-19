@@ -226,7 +226,6 @@ void EmuWindow_SDL2::Present() {
     SDL_GL_MakeCurrent(render_window, window_context);
     SDL_GL_SetSwapInterval(1);
     while (IsOpen()) {
-        VideoCore::g_renderer->TryPresent(100);
         SDL_GL_SwapWindow(render_window);
     }
     SDL_GL_MakeCurrent(render_window, nullptr);

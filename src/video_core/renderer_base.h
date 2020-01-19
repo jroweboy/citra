@@ -31,10 +31,6 @@ public:
     /// Finalize rendering the guest frame and draw into the presentation texture
     virtual void SwapBuffers() = 0;
 
-    /// Draws the latest frame to the window waiting timeout_ms for a frame to arrive (Renderer
-    /// specific implementation)
-    virtual void TryPresent(int timeout_ms) = 0;
-
     /// Prepares for video dumping (e.g. create necessary buffers, etc)
     virtual void PrepareVideoDumping() = 0;
 

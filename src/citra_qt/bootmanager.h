@@ -7,18 +7,20 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <QOpenGLWidget>
 #include <QThread>
 #include <QWidget>
-#include <QWindow>
 #include "common/thread.h"
 #include "core/core.h"
 #include "core/frontend/emu_window.h"
+#include "core/frontend/video_presentation.h"
 
 class QKeyEvent;
 class QScreen;
 class QTouchEvent;
 class QOffscreenSurface;
 class QOpenGLContext;
+class QSurface;
 
 class GMainWindow;
 class GRenderWindow;
@@ -31,13 +33,15 @@ class GLContext : public Frontend::GraphicsContext {
 public:
     explicit GLContext(QOpenGLContext* shared_context);
 
+    explicit GLContext(QOpenGLContext* wrap_context, QSurface* surface);
+
     void MakeCurrent() override;
 
     void DoneCurrent() override;
 
 private:
     QOpenGLContext* context;
-    QOffscreenSurface* surface;
+    QSurface* surface;
 };
 
 class EmuThread final : public QThread {
@@ -124,22 +128,24 @@ signals:
     void LoadProgress(VideoCore::LoadCallbackStage stage, std::size_t value, std::size_t total);
 };
 
-class OpenGLWindow : public QWindow {
+class OpenGLWidget : public QOpenGLWidget {
     Q_OBJECT
 public:
-    explicit OpenGLWindow(QWindow* parent, QWidget* event_handler, QOpenGLContext* shared_context);
+    explicit OpenGLWidget(QWidget* parent);
 
-    ~OpenGLWindow();
-
-    void Present();
+    ~OpenGLWidget();
 
 protected:
-    bool event(QEvent* event) override;
-    void exposeEvent(QExposeEvent* event) override;
+    void initializeGL() override;
+
+    void resizeGL(int w, int h) override;
+
+    void paintGL() override;
 
 private:
-    QOpenGLContext* context;
     QWidget* event_handler;
+
+    std::unique_ptr<Frontend::VideoPresentation> present;
 };
 
 class GRenderWindow : public QWidget, public Frontend::EmuWindow {
@@ -211,13 +217,10 @@ private:
 
     QByteArray geometry;
 
-    /// Native window handle that backs this presentation widget
-    QWindow* child_window = nullptr;
+    /// Widget that holds the presentation context
+    OpenGLWidget* child_window = nullptr;
 
-    /// In order to embed the window into GRenderWindow, you need to use createWindowContainer to
-    /// put the child_window into a widget then add it to the layout. This child_widget can be
-    /// parented to GRenderWindow and use Qt's lifetime system
-    QWidget* child_widget = nullptr;
+    OpenGLWidget* child_window2 = nullptr;
 
     EmuThread* emu_thread;
 
