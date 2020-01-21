@@ -26,11 +26,6 @@ std::atomic<bool> g_use_disk_shader_cache;
 std::atomic<bool> g_renderer_bg_color_update_requested;
 std::atomic<bool> g_renderer_sampler_update_requested;
 std::atomic<bool> g_renderer_shader_update_requested;
-// Screenshot
-std::atomic<bool> g_renderer_screenshot_requested;
-void* g_screenshot_bits;
-std::function<void()> g_screenshot_complete_callback;
-Layout::FramebufferLayout g_screenshot_framebuffer_layout;
 
 Memory::MemorySystem* g_memory;
 
@@ -60,18 +55,6 @@ void Shutdown() {
     g_renderer.reset();
 
     LOG_DEBUG(Render, "shutdown OK");
-}
-
-void RequestScreenshot(void* data, std::function<void()> callback,
-                       const Layout::FramebufferLayout& layout) {
-    if (g_renderer_screenshot_requested) {
-        LOG_ERROR(Render, "A screenshot is already requested or in progress, ignoring the request");
-        return;
-    }
-    g_screenshot_bits = data;
-    g_screenshot_complete_callback = std::move(callback);
-    g_screenshot_framebuffer_layout = layout;
-    g_renderer_screenshot_requested = true;
 }
 
 u16 GetResolutionScaleFactor() {

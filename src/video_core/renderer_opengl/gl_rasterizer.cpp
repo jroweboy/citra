@@ -1546,6 +1546,8 @@ bool RasterizerOpenGL::AccelerateDisplay(const GPU::Regs::FramebufferConfig& con
         (float)src_rect.top / (float)scaled_height, (float)src_rect.right / (float)scaled_width);
 
     screen_info.display_texture = src_surface->texture.handle;
+    screen_info.texture.width = src_surface->width;
+    screen_info.texture.height = src_surface->height;
 
     return true;
 }

@@ -124,13 +124,36 @@ void OpenGLWidget::resizeGL(int w, int h) {
 
 void OpenGLWidget::paintGL() {
     auto* emu_window = reinterpret_cast<GRenderWindow*>(event_handler);
-    present->Present(emu_window->GetFramebufferLayout());
+    const auto& layout = emu_window->GetFramebufferLayout();
+    present->Present(layout);
+    if (screenshot_requested) {
+        present->CaptureScreenshot(screenshot_image.bits(), layout, callback);
+        screenshot_requested = false;
+    }
     auto f = QOpenGLContext::currentContext()->versionFunctions<QOpenGLFunctions_3_3_Core>();
     f->glFinish();
 }
 
-GRenderWindow::GRenderWindow(QWidget* parent_, EmuThread* emu_thread)
-    : QWidget(parent_), emu_thread(emu_thread) {
+void OpenGLWidget::RequestScreenshot(u16 res_scale, const QString& screenshot_path) {
+    if (res_scale == 0)
+        res_scale = VideoCore::GetResolutionScaleFactor();
+    auto* emu_window = reinterpret_cast<GRenderWindow*>(event_handler);
+    const auto& layout = emu_window->GetFramebufferLayout();
+    screenshot_image = QImage(QSize(layout.width, layout.height), QImage::Format_RGB32);
+    screenshot_requested = true;
+    callback = [=] {
+        const std::string std_screenshot_path = screenshot_path.toStdString();
+        if (screenshot_image.mirrored(false, true).save(screenshot_path)) {
+            LOG_INFO(Frontend, "Screenshot saved to \"{}\"", std_screenshot_path);
+        } else {
+            LOG_ERROR(Frontend, "Failed to save screenshot to \"{}\"", std_screenshot_path);
+        }
+    };
+}
+
+GRenderWindow::GRenderWindow(QWidget* parent, EmuThread* emu_thread)
+    : QWidget(parent), emu_thread(emu_thread) {
+    auto* main_win = static_cast<GMainWindow*>(parent);
 
     setWindowTitle(QStringLiteral("Citra %1 | %2-%3")
                        .arg(Common::g_build_name, Common::g_scm_branch, Common::g_scm_desc));
@@ -141,7 +164,7 @@ GRenderWindow::GRenderWindow(QWidget* parent_, EmuThread* emu_thread)
     InputCommon::Init();
 
     GMainWindow* parent = GetMainWindow();
-    connect(this, &GRenderWindow::FirstFrameDisplayed, parent, &GMainWindow::OnLoadComplete);
+    connect(this, &GRenderWindow::FirstFrameDisplayed, main_win, &GMainWindow::OnLoadComplete);
 }
 
 GRenderWindow::~GRenderWindow() {
@@ -324,10 +347,6 @@ void GRenderWindow::InitRenderTarget() {
     QWindow* parent_win_handle = parent ? parent->windowHandle() : nullptr;
     child_window = new OpenGLWidget(this);
     child_window->resize(Core::kScreenTopWidth, Core::kScreenTopHeight + Core::kScreenBottomHeight);
-    child_window2 = new OpenGLWidget(this);
-    child_window2->resize(Core::kScreenTopWidth,
-                          Core::kScreenTopHeight + Core::kScreenBottomHeight);
-    child_window2->setParent(nullptr);
     layout()->addWidget(child_window);
 
     core_context = CreateSharedContext();
@@ -345,21 +364,9 @@ void GRenderWindow::ReleaseRenderTarget() {
 }
 
 void GRenderWindow::CaptureScreenshot(u32 res_scale, const QString& screenshot_path) {
-    if (res_scale == 0)
-        res_scale = VideoCore::GetResolutionScaleFactor();
-    const Layout::FramebufferLayout layout{Layout::FrameLayoutFromResolutionScale(res_scale)};
-    screenshot_image = QImage(QSize(layout.width, layout.height), QImage::Format_RGB32);
-    VideoCore::RequestScreenshot(
-        screenshot_image.bits(),
-        [=] {
-            const std::string std_screenshot_path = screenshot_path.toStdString();
-            if (screenshot_image.mirrored(false, true).save(screenshot_path)) {
-                LOG_INFO(Frontend, "Screenshot saved to \"{}\"", std_screenshot_path);
-            } else {
-                LOG_ERROR(Frontend, "Failed to save screenshot to \"{}\"", std_screenshot_path);
-            }
-        },
-        layout);
+    if (child_window) {
+        child_window->RequestScreenshot(res_scale, screenshot_path);
+    }
 }
 
 void GRenderWindow::OnMinimalClientAreaChangeRequest(std::pair<u32, u32> minimal_size) {
@@ -376,7 +383,6 @@ void GRenderWindow::OnEmulationStopping() {
 
 void GRenderWindow::showEvent(QShowEvent* event) {
     QWidget::showEvent(event);
-    child_window2->show();
 }
 
 std::unique_ptr<Frontend::GraphicsContext> GRenderWindow::CreateSharedContext() const {

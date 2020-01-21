@@ -22,7 +22,6 @@ namespace Frontend {
 struct Frame {
     struct Screen {
         OpenGL::OGLTexture texture;
-        Common::Rectangle<float> tex_coords;
         u32 scaled_width;
         u32 scaled_height;
     };
@@ -83,7 +82,6 @@ private:
     void InitOpenGLObjects();
     void PrepareRendertarget();
     void RenderVideoDumping();
-    void RenderScreenshot();
     void ConfigureFramebufferTexture(TextureInfo& texture,
                                      const GPU::Regs::FramebufferConfig& framebuffer);
 

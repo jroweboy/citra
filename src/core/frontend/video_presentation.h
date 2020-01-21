@@ -85,6 +85,13 @@ public:
     void Present(const Layout::FramebufferLayout&);
 
     /**
+     * Uses the current frame from the texture mailbox and writes it to the void* provided. Calls
+     * the callback function when completed
+     */
+    void CaptureScreenshot(void* write_ptr, const Layout::FramebufferLayout& layout,
+                           std::function<void(void)> callback);
+
+    /**
      * Enable rendering the most recent guest frame
      */
     void EnableMailbox(std::shared_ptr<Frontend::TextureMailbox> mailbox);

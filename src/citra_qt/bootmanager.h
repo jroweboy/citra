@@ -128,12 +128,20 @@ signals:
     void LoadProgress(VideoCore::LoadCallbackStage stage, std::size_t value, std::size_t total);
 };
 
+/**
+ * Presentation widget, retrieves the latest frame to display through the texture mailbox, and draws
+ * it to the screen. This class can be instantiated multiple times with the same mailbox for
+ * multiwindow support
+ */
 class OpenGLWidget : public QOpenGLWidget {
     Q_OBJECT
 public:
     explicit OpenGLWidget(QWidget* parent);
 
     ~OpenGLWidget();
+
+    /// On next draw, start a pixel transfer of the frame to the path requested;
+    void RequestScreenshot(u16 res_scale, const QString& screenshot_path);
 
 protected:
     void initializeGL() override;
@@ -146,6 +154,11 @@ private:
     QWidget* event_handler;
 
     std::unique_ptr<Frontend::VideoPresentation> present;
+    bool screenshot_requested = false;
+
+    /// Temporary storage of the screenshot taken
+    QImage screenshot_image;
+    std::function<void(void)> callback;
 };
 
 class GRenderWindow : public QWidget, public Frontend::EmuWindow {
@@ -220,12 +233,7 @@ private:
     /// Widget that holds the presentation context
     OpenGLWidget* child_window = nullptr;
 
-    OpenGLWidget* child_window2 = nullptr;
-
     EmuThread* emu_thread;
-
-    /// Temporary storage of the screenshot taken
-    QImage screenshot_image;
     bool first_frame = false;
 
 protected:

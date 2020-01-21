@@ -34,6 +34,8 @@
 #include "video_core/renderer_opengl/renderer_opengl.h"
 #include "video_core/video_core.h"
 
+#pragma optimize("", off)
+
 namespace OpenGL {
 
 constexpr std::size_t SWAP_CHAIN_SIZE = 4;
@@ -245,13 +247,20 @@ void RendererOpenGL::SwapBuffers() {
         for (auto i : {0, 1, 2}) {
             const auto& read = screen_infos[i];
             auto& draw = frame->screens[i];
-            draw.tex_coords = read.display_texcoords;
             glFramebufferTexture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, read.display_texture,
                                  0);
             glReadBuffer(GL_COLOR_ATTACHMENT0);
             glBindTexture(GL_TEXTURE_2D, draw.texture.handle);
-            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, draw.scaled_width, draw.scaled_height,
-                             0);
+
+            u32 x = std::min(read.display_texcoords.left, read.display_texcoords.right);
+            u32 y = std::min(read.display_texcoords.bottom, read.display_texcoords.top);
+            u32 width = std::abs(read.display_texcoords.right - read.display_texcoords.left) *
+                        read.texture.width * res_scale;
+            u32 height = std::abs(read.display_texcoords.bottom - read.display_texcoords.top) *
+                         read.texture.height * res_scale;
+            ASSERT_MSG(width == draw.scaled_width, "Unexpected width");
+            ASSERT_MSG(height == draw.scaled_height, "Unexpected height");
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, x, y, width, height);
         }
 
         // Create a fence for the frontend to wait on and swap this frame to OffTex
@@ -274,41 +283,6 @@ void RendererOpenGL::SwapBuffers() {
 
     if (Pica::g_debug_context && Pica::g_debug_context->recorder) {
         Pica::g_debug_context->recorder->FrameFinished();
-    }
-}
-
-void RendererOpenGL::RenderScreenshot() {
-    if (VideoCore::g_renderer_screenshot_requested) {
-        // Draw this frame to the screenshot framebuffer
-        // screenshot_framebuffer.Create();
-        GLuint old_read_fb = state.draw.read_framebuffer;
-        GLuint old_draw_fb = state.draw.draw_framebuffer;
-        // state.draw.read_framebuffer = state.draw.draw_framebuffer =
-        // screenshot_framebuffer.handle;
-        state.Apply();
-
-        Layout::FramebufferLayout layout{VideoCore::g_screenshot_framebuffer_layout};
-
-        GLuint renderbuffer;
-        glGenRenderbuffers(1, &renderbuffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB8, layout.width, layout.height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
-                                  renderbuffer);
-        // TODO move screenshot to video presentation
-        // DrawScreens(layout);
-
-        glReadPixels(0, 0, layout.width, layout.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV,
-                     VideoCore::g_screenshot_bits);
-
-        // screenshot_framebuffer.Release();
-        state.draw.read_framebuffer = old_read_fb;
-        state.draw.draw_framebuffer = old_draw_fb;
-        state.Apply();
-        glDeleteRenderbuffers(1, &renderbuffer);
-
-        VideoCore::g_screenshot_complete_callback();
-        VideoCore::g_renderer_screenshot_requested = false;
     }
 }
 
@@ -340,11 +314,10 @@ void RendererOpenGL::PrepareRendertarget() {
                 // performance problem.
                 ConfigureFramebufferTexture(screen_infos[i].texture, framebuffer);
             }
-            LoadFBToScreenInfo(framebuffer, screen_infos[i], i == 1);
-
             // Resize the texture in case the framebuffer size has changed
             screen_infos[i].texture.width = framebuffer.width;
             screen_infos[i].texture.height = framebuffer.height;
+            LoadFBToScreenInfo(framebuffer, screen_infos[i], i == 1);
         }
     }
 }

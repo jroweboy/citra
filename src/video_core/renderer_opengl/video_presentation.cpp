@@ -219,6 +219,7 @@ public:
     OGLBuffer vertex_buffer{};
     OGLProgram shader{};
     OGLFramebuffer screenshot_framebuffer{};
+    OGLRenderbuffer screenshot_storage{};
     OGLSampler filter_sampler{};
 
     // Shader uniform location indices
@@ -240,6 +241,15 @@ public:
                      0.0f);
 
         filter_sampler.Create();
+        screenshot_framebuffer.Create();
+        screenshot_storage.Create();
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, screenshot_framebuffer.handle);
+        glBindRenderbuffer(GL_RENDERBUFFER, screenshot_storage.handle);
+        glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+                                  screenshot_storage.handle);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
         ReloadSampler();
 
         ReloadShader();
@@ -335,7 +345,7 @@ public:
         attrib_tex_coord = glGetAttribLocation(shader.handle, "vert_tex_coord");
     }
 
-    void DrawScreens(const Layout::FramebufferLayout& layout, Frame* frame) {
+    void DrawScreens(const Layout::FramebufferLayout& layout, const Frame& frame) {
         if (VideoCore::g_renderer_bg_color_update_requested.exchange(false)) {
             // Update background color before drawing
             glClearColor(Settings::values.bg_red, Settings::values.bg_green,
@@ -377,50 +387,133 @@ public:
             glUniform1i(uniform_color_texture_r, 1);
         }
 
-        auto& [topl, topr, bot] = frame->screens;
+        auto& [topl, topr, bot] = frame.screens;
 
         glUniform1i(uniform_layer, 0);
         if (layout.top_screen_enabled) {
-            if (Settings::values.render_3d == Settings::StereoRenderOption::Off) {
-                DrawSingleScreenRotated(topl, (float)top_screen.left, (float)top_screen.top,
-                                        (float)top_screen.GetWidth(),
-                                        (float)top_screen.GetHeight());
-            } else if (Settings::values.render_3d == Settings::StereoRenderOption::SideBySide) {
-                DrawSingleScreenRotated(topl, (float)top_screen.left / 2, (float)top_screen.top,
-                                        (float)top_screen.GetWidth() / 2,
-                                        (float)top_screen.GetHeight());
-                glUniform1i(uniform_layer, 1);
-                DrawSingleScreenRotated(topr,
-                                        ((float)top_screen.left / 2) + ((float)layout.width / 2),
-                                        (float)top_screen.top, (float)top_screen.GetWidth() / 2,
-                                        (float)top_screen.GetHeight());
-            } else if (stereo_single_screen) {
-                DrawSingleScreenStereoRotated(topl, topr, (float)top_screen.left,
-                                              (float)top_screen.top, (float)top_screen.GetWidth(),
-                                              (float)top_screen.GetHeight());
+            if (layout.is_rotated) {
+                if (Settings::values.render_3d == Settings::StereoRenderOption::Off) {
+                    DrawSingleScreenRotated(topl, (float)top_screen.left, (float)top_screen.top,
+                                            (float)top_screen.GetWidth(),
+                                            (float)top_screen.GetHeight());
+                } else if (Settings::values.render_3d == Settings::StereoRenderOption::SideBySide) {
+                    DrawSingleScreenRotated(topl, (float)top_screen.left / 2, (float)top_screen.top,
+                                            (float)top_screen.GetWidth() / 2,
+                                            (float)top_screen.GetHeight());
+                    glUniform1i(uniform_layer, 1);
+                    DrawSingleScreenRotated(
+                        topr, ((float)top_screen.left / 2) + ((float)layout.width / 2),
+                        (float)top_screen.top, (float)top_screen.GetWidth() / 2,
+                        (float)top_screen.GetHeight());
+                } else if (stereo_single_screen) {
+                    DrawSingleScreenStereoRotated(
+                        topl, topr, (float)top_screen.left, (float)top_screen.top,
+                        (float)top_screen.GetWidth(), (float)top_screen.GetHeight());
+                }
+            } else {
+                if (Settings::values.render_3d == Settings::StereoRenderOption::Off) {
+                    DrawSingleScreen(topl, (float)top_screen.left, (float)top_screen.top,
+                                     (float)top_screen.GetWidth(), (float)top_screen.GetHeight());
+                } else if (Settings::values.render_3d == Settings::StereoRenderOption::SideBySide) {
+                    DrawSingleScreen(topl, (float)top_screen.left / 2, (float)top_screen.top,
+                                     (float)top_screen.GetWidth() / 2,
+                                     (float)top_screen.GetHeight());
+                    glUniform1i(uniform_layer, 1);
+                    DrawSingleScreen(topr, ((float)top_screen.left / 2) + ((float)layout.width / 2),
+                                     (float)top_screen.top, (float)top_screen.GetWidth() / 2,
+                                     (float)top_screen.GetHeight());
+                } else if (stereo_single_screen) {
+                    DrawSingleScreenStereo(topl, topr, (float)top_screen.left,
+                                           (float)top_screen.top, (float)top_screen.GetWidth(),
+                                           (float)top_screen.GetHeight());
+                }
             }
         }
         glUniform1i(uniform_layer, 0);
         if (layout.bottom_screen_enabled) {
-            if (Settings::values.render_3d == Settings::StereoRenderOption::Off) {
-                DrawSingleScreenRotated(bot, (float)bottom_screen.left, (float)bottom_screen.top,
-                                        (float)bottom_screen.GetWidth(),
-                                        (float)bottom_screen.GetHeight());
-            } else if (Settings::values.render_3d == Settings::StereoRenderOption::SideBySide) {
-                DrawSingleScreenRotated(
-                    bot, (float)bottom_screen.left / 2, (float)bottom_screen.top,
-                    (float)bottom_screen.GetWidth() / 2, (float)bottom_screen.GetHeight());
-                glUniform1i(uniform_layer, 1);
-                DrawSingleScreenRotated(
-                    bot, ((float)bottom_screen.left / 2) + ((float)layout.width / 2),
-                    (float)bottom_screen.top, (float)bottom_screen.GetWidth() / 2,
-                    (float)bottom_screen.GetHeight());
-            } else if (stereo_single_screen) {
-                DrawSingleScreenStereoRotated(
-                    bot, bot, (float)bottom_screen.left, (float)bottom_screen.top,
-                    (float)bottom_screen.GetWidth(), (float)bottom_screen.GetHeight());
+            if (layout.is_rotated) {
+                if (Settings::values.render_3d == Settings::StereoRenderOption::Off) {
+                    DrawSingleScreenRotated(
+                        bot, (float)bottom_screen.left, (float)bottom_screen.top,
+                        (float)bottom_screen.GetWidth(), (float)bottom_screen.GetHeight());
+                } else if (Settings::values.render_3d == Settings::StereoRenderOption::SideBySide) {
+                    DrawSingleScreenRotated(
+                        bot, (float)bottom_screen.left / 2, (float)bottom_screen.top,
+                        (float)bottom_screen.GetWidth() / 2, (float)bottom_screen.GetHeight());
+                    glUniform1i(uniform_layer, 1);
+                    DrawSingleScreenRotated(
+                        bot, ((float)bottom_screen.left / 2) + ((float)layout.width / 2),
+                        (float)bottom_screen.top, (float)bottom_screen.GetWidth() / 2,
+                        (float)bottom_screen.GetHeight());
+                } else if (stereo_single_screen) {
+                    DrawSingleScreenStereoRotated(
+                        bot, bot, (float)bottom_screen.left, (float)bottom_screen.top,
+                        (float)bottom_screen.GetWidth(), (float)bottom_screen.GetHeight());
+                }
+            } else {
+                if (Settings::values.render_3d == Settings::StereoRenderOption::Off) {
+                    DrawSingleScreen(bot, (float)bottom_screen.left, (float)bottom_screen.top,
+                                     (float)bottom_screen.GetWidth(),
+                                     (float)bottom_screen.GetHeight());
+                } else if (Settings::values.render_3d == Settings::StereoRenderOption::SideBySide) {
+                    DrawSingleScreen(bot, (float)bottom_screen.left / 2, (float)bottom_screen.top,
+                                     (float)bottom_screen.GetWidth() / 2,
+                                     (float)bottom_screen.GetHeight());
+                    glUniform1i(uniform_layer, 1);
+                    DrawSingleScreen(bot,
+                                     ((float)bottom_screen.left / 2) + ((float)layout.width / 2),
+                                     (float)bottom_screen.top, (float)bottom_screen.GetWidth() / 2,
+                                     (float)bottom_screen.GetHeight());
+                } else if (stereo_single_screen) {
+                    DrawSingleScreenStereo(
+                        bot, bot, (float)bottom_screen.left, (float)bottom_screen.top,
+                        (float)bottom_screen.GetWidth(), (float)bottom_screen.GetHeight());
+                }
             }
         }
+    }
+
+    void DrawSingleScreen(const Frame::Screen& screen, float x, float y, float w, float h) {
+
+        const std::array<ScreenRectVertex, 4> vertices = {{
+            ScreenRectVertex(x, y, 1, 1),
+            ScreenRectVertex(x + w, y, 0, 1),
+            ScreenRectVertex(x, y + h, 1, 0),
+            ScreenRectVertex(x + w, y + h, 0, 0),
+        }};
+
+        glUniform4f(uniform_i_resolution, screen.scaled_width, screen.scaled_height,
+                    1.0 / screen.scaled_width, 1.0 / screen.scaled_height);
+        glUniform4f(uniform_o_resolution, w, h, 1.0f / w, 1.0f / h);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, screen.texture.handle);
+        glBindSampler(0, filter_sampler.handle);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices.data());
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+
+    void DrawSingleScreenStereo(const Frame::Screen& screen_l, const Frame::Screen& screen_r,
+                                float x, float y, float w, float h) {
+
+        const std::array<ScreenRectVertex, 4> vertices = {{
+            ScreenRectVertex(x, y, 1, 1),
+            ScreenRectVertex(x + w, y, 0, 1),
+            ScreenRectVertex(x, y + h, 1, 0),
+            ScreenRectVertex(x + w, y + h, 0, 0),
+        }};
+
+        glUniform4f(uniform_i_resolution, screen_l.scaled_width, screen_l.scaled_height,
+                    1.0 / screen_l.scaled_width, 1.0 / screen_l.scaled_height);
+        glUniform4f(uniform_o_resolution, w, h, 1.0f / w, 1.0f / h);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, screen_l.texture.handle);
+        glBindSampler(0, filter_sampler.handle);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, screen_r.texture.handle);
+        glBindSampler(1, filter_sampler.handle);
+
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices.data());
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
     void DrawSingleScreenRotated(const Frame::Screen& screen, float x, float y, float w, float h) {
@@ -469,6 +562,34 @@ public:
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices.data());
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
+
+    void CaptureScreenshot(const Frontend::Frame& frame, void* write_ptr,
+                           const Layout::FramebufferLayout& layout,
+                           std::function<void(void)> callback) {
+
+        // TODO: Don't query the framebuffer binding, find a better way to restore whatever the
+        // frontend sets as the FBO
+        GLint original_draw_fbo = 0;
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &original_draw_fbo);
+
+        // Draw this frame to the screenshot framebuffer (and set it as the read buffer to read the
+        // pixels back after)
+        glBindFramebuffer(GL_FRAMEBUFFER, screenshot_framebuffer.handle);
+
+        // Recreate the screenshot_storage. (TODO: don't recreate it if its already large enough)
+        glBindRenderbuffer(GL_RENDERBUFFER, screenshot_storage.handle);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB8, layout.width, layout.height);
+
+        DrawScreens(layout, frame);
+
+        // Now read back the screenshot we just drew
+        glReadPixels(0, 0, layout.width, layout.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV,
+                     write_ptr);
+
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, original_draw_fbo);
+
+        callback();
+    }
 };
 
 VideoPresentation::VideoPresentation() : osd(), impl(std::make_unique<Impl>()) {}
@@ -503,10 +624,7 @@ void VideoPresentation::Present(const Layout::FramebufferLayout& layout) {
     // glDeleteSync(frame.render_sync);
     // frame.render_sync = 0;
 
-    // TODO actually draw the frame here
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, frame->present.handle);
-    // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    impl->DrawScreens(layout, frame);
+    impl->DrawScreens(layout, *frame);
 
     osd.Render();
 
@@ -517,6 +635,16 @@ void VideoPresentation::Present(const Layout::FramebufferLayout& layout) {
 
 void VideoPresentation::EnableMailbox(std::shared_ptr<Frontend::TextureMailbox> mailbox_) {
     mailbox = mailbox_;
+}
+
+void VideoPresentation::CaptureScreenshot(void* write_ptr, const Layout::FramebufferLayout& layout,
+                                          std::function<void(void)> callback) {
+    auto frame = mailbox->TryGetPresentFrame(0ms);
+    if (!frame) {
+        LOG_DEBUG(Render_OpenGL, "Could not capture screenshot");
+        return;
+    }
+    impl->CaptureScreenshot(*frame, write_ptr, layout, callback);
 }
 
 void VideoPresentation::ToggleOSD(bool osd) {
