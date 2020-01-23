@@ -34,8 +34,6 @@
 #include "video_core/renderer_opengl/renderer_opengl.h"
 #include "video_core/video_core.h"
 
-#pragma optimize("", off)
-
 namespace OpenGL {
 
 constexpr std::size_t SWAP_CHAIN_SIZE = 4;
@@ -66,14 +64,15 @@ public:
     }
 
     void ReloadPresentFrame(Frontend::Frame* frame) override {
-        frame->present.Release();
-        frame->present.Create();
         GLint previous_draw_fbo{};
         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previous_draw_fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, frame->present.handle);
         for (auto i : {0, 1, 2}) {
+            auto& screen = frame->screens[i];
+            screen.present.Release();
+            screen.present.Create();
+            glBindFramebuffer(GL_FRAMEBUFFER, screen.present.handle);
             glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D,
-                                 frame->screens[i].texture.handle);
+                                 screen.texture.handle);
         }
         if (!glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
             LOG_CRITICAL(Render_OpenGL, "Failed to recreate present FBO!");
@@ -91,42 +90,46 @@ public:
             auto& screen = frame->screens[i];
             screen.texture.Release();
             screen.texture.Create();
-            screen.scaled_height =
-                (i == 2 ? Core::kScreenBottomWidth : Core::kScreenTopWidth) * res_scale;
             screen.scaled_width =
+                (i == 2 ? Core::kScreenBottomWidth : Core::kScreenTopWidth) * res_scale;
+            screen.scaled_height =
                 (i == 2 ? Core::kScreenBottomHeight : Core::kScreenTopHeight) * res_scale;
             state.texture_units[i].texture_2d = screen.texture.handle;
         }
         state.Apply();
 
-        // Allocate textures for the screens
+        // Mark the read and draw framebuffer as dirty
+        state.draw.read_framebuffer = 0;
+        state.draw.draw_framebuffer = 0;
+        state.Apply();
+
         // TODO: need a better way to consolidate texture allocation
         for (auto i : {0, 1, 2}) {
             auto& screen = frame->screens[i];
-            // glActiveTexture(GL_TEXTURE0 + i);
+
+            // Recreate the FBO for the render target
+            screen.render.Release();
+            screen.render.Create();
+
+            // Configure the framebuffer for this texture
+            glBindFramebuffer(GL_FRAMEBUFFER, screen.render.handle);
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
+            glDrawBuffer(GL_COLOR_ATTACHMENT0);
             glBindTexture(GL_TEXTURE_2D, screen.texture.handle);
-            // swapped cause 3ds screen is swapped
+
+            // Allocate textures for the screens
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, screen.scaled_width, screen.scaled_height, 0,
                          GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, screen.texture.handle, 0);
+            if (!glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+                LOG_CRITICAL(Render_OpenGL, "Failed to recreate render FBO!");
+            }
         }
 
-        // Recreate the FBO for the render target
-        frame->render.Release();
-        frame->render.Create();
-        state.draw.read_framebuffer = frame->render.handle;
-        state.draw.draw_framebuffer = frame->render.handle;
-        state.Apply();
-        for (auto i : {0, 1, 2}) {
-            glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i,
-                                 frame->screens[i].texture.handle, 0);
-        }
-        if (!glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
-            LOG_CRITICAL(Render_OpenGL, "Failed to recreate render FBO!");
-        }
         prev_state.Apply();
         frame->res_scale = res_scale;
         frame->texture_reloaded = true;
@@ -241,12 +244,13 @@ void RendererOpenGL::SwapBuffers() {
         }
 
         state.draw.read_framebuffer = swap_framebuffer.handle;
-        state.draw.draw_framebuffer = frame->render.handle;
+        state.draw.draw_framebuffer = 0;
         state.Apply();
 
         for (auto i : {0, 1, 2}) {
             const auto& read = screen_infos[i];
             auto& draw = frame->screens[i];
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw.render.handle);
             glFramebufferTexture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, read.display_texture,
                                  0);
             glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -254,13 +258,14 @@ void RendererOpenGL::SwapBuffers() {
 
             u32 x = std::min(read.display_texcoords.left, read.display_texcoords.right);
             u32 y = std::min(read.display_texcoords.bottom, read.display_texcoords.top);
-            u32 width = std::abs(read.display_texcoords.right - read.display_texcoords.left) *
+            // due to 3DS screen rotate, width refers to top/bottom and height is right/left
+            u32 width = std::abs(read.display_texcoords.bottom - read.display_texcoords.top) *
                         read.texture.width * res_scale;
-            u32 height = std::abs(read.display_texcoords.bottom - read.display_texcoords.top) *
+            u32 height = std::abs(read.display_texcoords.right - read.display_texcoords.left) *
                          read.texture.height * res_scale;
-            ASSERT_MSG(width == draw.scaled_width, "Unexpected width");
-            ASSERT_MSG(height == draw.scaled_height, "Unexpected height");
-            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, x, y, width, height);
+            glBlitFramebuffer(x, y, width, height, 0, 0, draw.scaled_width, draw.scaled_height,
+                              GL_COLOR_BUFFER_BIT,
+                              Settings::values.filter_mode ? GL_LINEAR : GL_NEAREST);
         }
 
         // Create a fence for the frontend to wait on and swap this frame to OffTex
@@ -358,7 +363,6 @@ void RendererOpenGL::RenderVideoDumping() {
  */
 void RendererOpenGL::LoadFBToScreenInfo(const GPU::Regs::FramebufferConfig& framebuffer,
                                         ScreenInfo& screen_info, bool right_eye) {
-
     if (framebuffer.address_right1 == 0 || framebuffer.address_right2 == 0)
         right_eye = false;
 

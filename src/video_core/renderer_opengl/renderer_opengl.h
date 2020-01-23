@@ -21,14 +21,13 @@ namespace Frontend {
 
 struct Frame {
     struct Screen {
-        OpenGL::OGLTexture texture;
+        OpenGL::OGLFramebuffer render{};  /// FBO created on the render thread
+        OpenGL::OGLFramebuffer present{}; /// FBO created on the present thread
+        OpenGL::OGLTexture texture;       /// Holds the current screen texture
         u32 scaled_width;
         u32 scaled_height;
     };
     std::array<Screen, 3> screens; /// 3DS textures (TopLeft, TopRight, Bottom)
-
-    OpenGL::OGLFramebuffer render{};  /// FBO created on the render thread
-    OpenGL::OGLFramebuffer present{}; /// FBO created on the present thread
 
     bool texture_reloaded = false; /// Texture attachment was recreated (ie: resized)
 

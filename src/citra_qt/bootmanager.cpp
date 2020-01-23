@@ -162,8 +162,6 @@ GRenderWindow::GRenderWindow(QWidget* parent, EmuThread* emu_thread)
     layout->setMargin(0);
     setLayout(layout);
     InputCommon::Init();
-
-    GMainWindow* parent = GetMainWindow();
     connect(this, &GRenderWindow::FirstFrameDisplayed, main_win, &GMainWindow::OnLoadComplete);
 }
 
