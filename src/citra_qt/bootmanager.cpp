@@ -104,12 +104,13 @@ void EmuThread::run() {
 }
 
 OpenGLWidget::OpenGLWidget(QWidget* parent) : QOpenGLWidget(parent), event_handler(parent) {
-    connect(this, &QOpenGLWidget::frameSwapped, this, QOverload<>::of(&QWidget::update));
     // TODO: One of these flags might be interesting: WA_OpaquePaintEvent, WA_NoBackground,
     // WA_DontShowOnScreen, WA_DeleteOnClose
 }
 
-OpenGLWidget::~OpenGLWidget() {}
+OpenGLWidget::~OpenGLWidget() {
+    doneCurrent();
+}
 
 void OpenGLWidget::initializeGL() {
     auto* emu_window = reinterpret_cast<GRenderWindow*>(event_handler);
@@ -132,6 +133,7 @@ void OpenGLWidget::paintGL() {
     }
     auto f = QOpenGLContext::currentContext()->versionFunctions<QOpenGLFunctions_3_3_Core>();
     f->glFinish();
+    update();
 }
 
 void OpenGLWidget::RequestScreenshot(u16 res_scale, const QString& screenshot_path) {
@@ -338,17 +340,14 @@ void GRenderWindow::resizeEvent(QResizeEvent* event) {
 
 void GRenderWindow::InitRenderTarget() {
     ReleaseRenderTarget();
-
     first_frame = false;
-
-    GMainWindow* parent = GetMainWindow();
-    QWindow* parent_win_handle = parent ? parent->windowHandle() : nullptr;
     child_window = new OpenGLWidget(this);
     child_window->resize(Core::kScreenTopWidth, Core::kScreenTopHeight + Core::kScreenBottomHeight);
     layout()->addWidget(child_window);
 
     core_context = CreateSharedContext();
     resize(Core::kScreenTopWidth, Core::kScreenTopHeight + Core::kScreenBottomHeight);
+    OnFramebufferSizeChanged();
     OnMinimalClientAreaChangeRequest(GetActiveConfig().min_client_area_size);
     BackupGeometry();
 }

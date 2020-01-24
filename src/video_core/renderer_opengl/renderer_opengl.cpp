@@ -200,8 +200,6 @@ void RendererOpenGL::SwapBuffers() {
 
     PrepareRendertarget();
 
-    // RenderScreenshot();
-
     // RenderVideoDumping();
 
     const auto& layout = render_window.GetFramebufferLayout();
