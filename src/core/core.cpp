@@ -417,21 +417,25 @@ void System::RegisterImageInterface(std::shared_ptr<Frontend::ImageInterface> im
 
 void System::Shutdown() {
     // Log last frame performance stats
-    const auto perf_results = GetAndResetPerfStats();
-    telemetry_session->AddField(Telemetry::FieldType::Performance, "Shutdown_EmulationSpeed",
-                                perf_results.emulation_speed * 100.0);
-    telemetry_session->AddField(Telemetry::FieldType::Performance, "Shutdown_Framerate",
-                                perf_results.game_fps);
-    telemetry_session->AddField(Telemetry::FieldType::Performance, "Shutdown_Frametime",
-                                perf_results.frametime * 1000.0);
-    telemetry_session->AddField(Telemetry::FieldType::Performance, "Mean_Frametime_MS",
-                                perf_stats->GetMeanFrametime());
+    if (perf_stats) {
+        const auto perf_results = GetAndResetPerfStats();
+        telemetry_session->AddField(Telemetry::FieldType::Performance, "Shutdown_EmulationSpeed",
+                                    perf_results.emulation_speed * 100.0);
+        telemetry_session->AddField(Telemetry::FieldType::Performance, "Shutdown_Framerate",
+                                    perf_results.game_fps);
+        telemetry_session->AddField(Telemetry::FieldType::Performance, "Shutdown_Frametime",
+                                    perf_results.frametime * 1000.0);
+        telemetry_session->AddField(Telemetry::FieldType::Performance, "Mean_Frametime_MS",
+                                    perf_stats->GetMeanFrametime());
+    }
 
+    // Shutting down telemetry requires an active GL Context so close it before the
+    // VideoCore::Shutdown()
+    telemetry_session.reset();
     // Shutdown emulation session
     GDBStub::Shutdown();
     VideoCore::Shutdown();
     HW::Shutdown();
-    telemetry_session.reset();
     perf_stats.reset();
     rpc_server.reset();
     cheat_engine.reset();

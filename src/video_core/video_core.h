@@ -52,6 +52,9 @@ enum class ResultStatus {
 /// Initialize the video core
 ResultStatus Init(Frontend::EmuWindow& emu_window, Memory::MemorySystem& memory);
 
+/// Start the GPU core on this thread
+void Start();
+
 /// Shutdown the video core
 void Shutdown();
 

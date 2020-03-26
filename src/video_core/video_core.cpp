@@ -53,6 +53,10 @@ ResultStatus Init(Frontend::EmuWindow& emu_window, Memory::MemorySystem& memory)
     return result;
 }
 
+void Start() {
+    g_renderer->Start();
+}
+
 /// Shutdown the video core
 void Shutdown() {
     Pica::Shutdown();

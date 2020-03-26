@@ -72,7 +72,6 @@
 #include "core/file_sys/archive_extsavedata.h"
 #include "core/file_sys/archive_source_sd_savedata.h"
 #include "core/frontend/applets/default_applets.h"
-#include "core/frontend/scope_acquire_context.h"
 #include "core/gdbstub/gdbstub.h"
 #include "core/hle/service/fs/archive.h"
 #include "core/hle/service/nfc/nfc.h"
@@ -806,15 +805,10 @@ bool GMainWindow::LoadROM(const QString& filename) {
     if (emu_thread != nullptr)
         ShutdownGame();
 
-    render_window->InitRenderTarget();
-
-    Frontend::ScopeAcquireContext scope(*render_window);
-
     const QString below_gl33_title = tr("OpenGL 3.3 Unsupported");
     const QString below_gl33_message = tr("Your GPU may not support OpenGL 3.3, or you do not "
                                           "have the latest graphics driver.");
-
-    if (!QOpenGLContext::globalShareContext()->versionFunctions<QOpenGLFunctions_3_3_Core>()) {
+    if (!render_window->InitRenderTarget()) {
         QMessageBox::critical(this, below_gl33_title, below_gl33_message);
         return false;
     }
@@ -2184,20 +2178,11 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setOrganizationName(QStringLiteral("Citra team"));
     QCoreApplication::setApplicationName(QStringLiteral("Citra"));
 
-    QSurfaceFormat format;
-    format.setVersion(3, 3);
-    format.setProfile(QSurfaceFormat::CoreProfile);
-    format.setSwapInterval(0);
-    // TODO: expose a setting for buffer value (ie default/single/double/triple)
-    format.setSwapBehavior(QSurfaceFormat::DefaultSwapBehavior);
-    QSurfaceFormat::setDefaultFormat(format);
-
 #ifdef __APPLE__
     std::string bin_path = FileUtil::GetBundleDirectory() + DIR_SEP + "..";
     chdir(bin_path.c_str());
 #endif
     QCoreApplication::setAttribute(Qt::AA_DontCheckOpenGLContextThreadAffinity);
-    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QApplication app(argc, argv);
 
     // Qt changes the locale and causes issues in float conversion using std::to_string() when

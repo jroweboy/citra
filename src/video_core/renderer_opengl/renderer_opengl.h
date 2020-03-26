@@ -50,6 +50,9 @@ public:
     /// Initialize the renderer
     VideoCore::ResultStatus Init() override;
 
+    /// Start the Renderer on this thread
+    void Start() override;
+
     /// Shutdown the renderer
     void ShutDown() override;
 
@@ -58,7 +61,7 @@ public:
 
     /// Draws the latest frame from texture mailbox to the currently bound draw framebuffer in this
     /// context
-    void TryPresent(int timeout_ms) override;
+    bool TryPresent(int timeout_ms) override;
 
     /// Prepares for video dumping (e.g. create necessary buffers, etc)
     void PrepareVideoDumping() override;
@@ -68,6 +71,7 @@ public:
 
 private:
     void InitOpenGLObjects();
+    bool Present(int timeout_ms);
     void ReloadSampler();
     void ReloadShader();
     void PrepareRendertarget();
@@ -133,6 +137,10 @@ private:
     std::array<OGLBuffer, 2> frame_dumping_pbos;
     GLuint current_pbo = 1;
     GLuint next_pbo = 0;
+
+    // Context for GL commands on the CPU thread
+    std::unique_ptr<Frontend::GraphicsContext> cpu_context;
+    bool has_debug_tool = false;
 };
 
 } // namespace OpenGL

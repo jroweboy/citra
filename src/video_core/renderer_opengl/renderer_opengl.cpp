@@ -35,6 +35,82 @@
 #include "video_core/renderer_opengl/texture_filters/texture_filter_manager.h"
 #include "video_core/video_core.h"
 
+namespace {
+
+const char* GetSource(GLenum source) {
+#define RET(s)                                                                                     \
+    case GL_DEBUG_SOURCE_##s:                                                                      \
+        return #s
+    switch (source) {
+        RET(API);
+        RET(WINDOW_SYSTEM);
+        RET(SHADER_COMPILER);
+        RET(THIRD_PARTY);
+        RET(APPLICATION);
+        RET(OTHER);
+    default:
+        UNREACHABLE();
+    }
+#undef RET
+}
+
+const char* GetType(GLenum type) {
+#define RET(t)                                                                                     \
+    case GL_DEBUG_TYPE_##t:                                                                        \
+        return #t
+    switch (type) {
+        RET(ERROR);
+        RET(DEPRECATED_BEHAVIOR);
+        RET(UNDEFINED_BEHAVIOR);
+        RET(PORTABILITY);
+        RET(PERFORMANCE);
+        RET(OTHER);
+        RET(MARKER);
+    default:
+        UNREACHABLE();
+    }
+#undef RET
+}
+
+void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
+                           const GLchar* message, const void* user_param) {
+    Log::Level level;
+    switch (severity) {
+    case GL_DEBUG_SEVERITY_HIGH:
+        level = Log::Level::Critical;
+        break;
+    case GL_DEBUG_SEVERITY_MEDIUM:
+        level = Log::Level::Warning;
+        break;
+    case GL_DEBUG_SEVERITY_NOTIFICATION:
+    case GL_DEBUG_SEVERITY_LOW:
+        level = Log::Level::Debug;
+        break;
+    }
+    LOG_GENERIC(Log::Class::Render_OpenGL, level, "{} {} {}: {}", GetSource(source), GetType(type),
+                id, message);
+}
+
+/// Returns true if any debug tool is attached
+bool HasDebugTool() {
+    const bool nsight = std::getenv("NVTX_INJECTION64_PATH") || std::getenv("NSIGHT_LAUNCHED");
+    if (nsight) {
+        return true;
+    }
+
+    GLint num_extensions;
+    glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
+    for (GLuint index = 0; index < static_cast<GLuint>(num_extensions); ++index) {
+        const auto name = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, index));
+        if (!std::strcmp(name, "GL_EXT_debug_tool")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // Anonymous namespace
+
 namespace Frontend {
 
 struct Frame {
@@ -54,7 +130,7 @@ namespace OpenGL {
 // If the size of this is too small, it ends up creating a soft cap on FPS as the renderer will have
 // to wait on available presentation frames. There doesn't seem to be much of a downside to a larger
 // number but 9 swap textures at 60FPS presentation allows for 800% speed so thats probably fine
-constexpr std::size_t SWAP_CHAIN_SIZE = 9;
+constexpr std::size_t SWAP_CHAIN_SIZE = 3;
 
 class OGLTextureMailbox : public Frontend::TextureMailbox {
 public:
@@ -293,7 +369,7 @@ static std::array<GLfloat, 3 * 2> MakeOrthographicMatrix(const float width, cons
 }
 
 RendererOpenGL::RendererOpenGL(Frontend::EmuWindow& window) : RendererBase{window} {
-    window.mailbox = std::make_unique<OGLTextureMailbox>();
+    window.mailbox = {};
 }
 
 RendererOpenGL::~RendererOpenGL() = default;
@@ -365,6 +441,12 @@ void RendererOpenGL::SwapBuffers() {
     Core::System::GetInstance().perf_stats->EndSystemFrame();
 
     render_window.PollEvents();
+
+    if (has_debug_tool) {
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        Present(0);
+        cpu_context->SwapBuffers();
+    }
 
     Core::System::GetInstance().frame_limiter.DoFrameLimiting(
         Core::System::GetInstance().CoreTiming().GetGlobalTimeUs());
@@ -562,6 +644,17 @@ void RendererOpenGL::LoadColorToActiveGLTexture(u8 color_r, u8 color_g, u8 color
  * Initializes the OpenGL state and creates persistent objects.
  */
 void RendererOpenGL::InitOpenGLObjects() {
+    has_debug_tool = HasDebugTool();
+    render_window.mailbox = std::make_unique<OGLTextureMailbox>();
+
+    if (GLAD_GL_KHR_debug) {
+        glEnable(GL_DEBUG_OUTPUT);
+        if (has_debug_tool) {
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        }
+        glDebugMessageCallback(DebugHandler, nullptr);
+    }
+
     glClearColor(Settings::values.bg_red, Settings::values.bg_green, Settings::values.bg_blue,
                  0.0f);
 
@@ -1013,12 +1106,21 @@ void RendererOpenGL::DrawScreens(const Layout::FramebufferLayout& layout) {
     }
 }
 
-void RendererOpenGL::TryPresent(int timeout_ms) {
+bool RendererOpenGL::TryPresent(int timeout_ms) {
+    if (has_debug_tool) {
+        LOG_DEBUG(Render_OpenGL,
+                  "Skipping presentation because we are presenting on the main context");
+        return false;
+    }
+    return Present(timeout_ms);
+}
+
+bool RendererOpenGL::Present(int timeout_ms) {
     const auto& layout = render_window.GetFramebufferLayout();
     auto frame = render_window.mailbox->TryGetPresentFrame(timeout_ms);
     if (!frame) {
         LOG_DEBUG(Render_OpenGL, "TryGetPresentFrame returned no frame to present");
-        return;
+        return false;
     }
 
     // Clearing before a full overwrite of a fbo can signal to drivers that they can avoid a
@@ -1046,6 +1148,7 @@ void RendererOpenGL::TryPresent(int timeout_ms) {
     glFlush();
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    return true;
 }
 
 /// Updates the framerate
@@ -1089,69 +1192,13 @@ void RendererOpenGL::ReleaseVideoDumpingGLObjects() {
     }
 }
 
-static const char* GetSource(GLenum source) {
-#define RET(s)                                                                                     \
-    case GL_DEBUG_SOURCE_##s:                                                                      \
-        return #s
-    switch (source) {
-        RET(API);
-        RET(WINDOW_SYSTEM);
-        RET(SHADER_COMPILER);
-        RET(THIRD_PARTY);
-        RET(APPLICATION);
-        RET(OTHER);
-    default:
-        UNREACHABLE();
-    }
-#undef RET
-}
-
-static const char* GetType(GLenum type) {
-#define RET(t)                                                                                     \
-    case GL_DEBUG_TYPE_##t:                                                                        \
-        return #t
-    switch (type) {
-        RET(ERROR);
-        RET(DEPRECATED_BEHAVIOR);
-        RET(UNDEFINED_BEHAVIOR);
-        RET(PORTABILITY);
-        RET(PERFORMANCE);
-        RET(OTHER);
-        RET(MARKER);
-    default:
-        UNREACHABLE();
-    }
-#undef RET
-}
-
-static void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum severity,
-                                  GLsizei length, const GLchar* message, const void* user_param) {
-    Log::Level level;
-    switch (severity) {
-    case GL_DEBUG_SEVERITY_HIGH:
-        level = Log::Level::Critical;
-        break;
-    case GL_DEBUG_SEVERITY_MEDIUM:
-        level = Log::Level::Warning;
-        break;
-    case GL_DEBUG_SEVERITY_NOTIFICATION:
-    case GL_DEBUG_SEVERITY_LOW:
-        level = Log::Level::Debug;
-        break;
-    }
-    LOG_GENERIC(Log::Class::Render_OpenGL, level, "{} {} {}: {}", GetSource(source), GetType(type),
-                id, message);
-}
-
 /// Initialize the renderer
 VideoCore::ResultStatus RendererOpenGL::Init() {
+    cpu_context = render_window.CreateSharedContext();
+    const auto scope = cpu_context->Acquire();
+
     if (!gladLoadGL()) {
         return VideoCore::ResultStatus::ErrorBelowGL33;
-    }
-
-    if (GLAD_GL_KHR_debug) {
-        glEnable(GL_DEBUG_OUTPUT);
-        glDebugMessageCallback(DebugHandler, nullptr);
     }
 
     const char* gl_version{reinterpret_cast<char const*>(glGetString(GL_VERSION))};
@@ -1182,6 +1229,10 @@ VideoCore::ResultStatus RendererOpenGL::Init() {
     TextureFilterManager::GetInstance().Reset();
 
     return VideoCore::ResultStatus::Success;
+}
+
+void RendererOpenGL::Start() {
+    cpu_context->MakeCurrent();
 }
 
 /// Shutdown the renderer

@@ -25,6 +25,9 @@ public:
     /// Initialize the renderer
     virtual VideoCore::ResultStatus Init() = 0;
 
+    /// Start the Renderer on this thread
+    virtual void Start() {}
+
     /// Shutdown the renderer
     virtual void ShutDown() = 0;
 
@@ -33,7 +36,7 @@ public:
 
     /// Draws the latest frame to the window waiting timeout_ms for a frame to arrive (Renderer
     /// specific implementation)
-    virtual void TryPresent(int timeout_ms) = 0;
+    virtual bool TryPresent(int timeout_ms) = 0;
 
     /// Prepares for video dumping (e.g. create necessary buffers, etc)
     virtual void PrepareVideoDumping() = 0;
