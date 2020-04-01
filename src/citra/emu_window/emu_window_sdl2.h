@@ -10,23 +10,6 @@
 
 struct SDL_Window;
 
-class SharedContext_SDL2 : public Frontend::GraphicsContext {
-public:
-    using SDL_GLContext = void*;
-
-    SharedContext_SDL2();
-
-    ~SharedContext_SDL2() override;
-
-    void MakeCurrent() override;
-
-    void DoneCurrent() override;
-
-private:
-    SDL_GLContext context;
-    SDL_Window* window;
-};
-
 class EmuWindow_SDL2 : public Frontend::EmuWindow {
 public:
     explicit EmuWindow_SDL2(bool fullscreen);
@@ -37,17 +20,11 @@ public:
     /// Polls window events
     void PollEvents() override;
 
-    /// Makes the graphics context current for the caller thread
-    void MakeCurrent() override;
-
-    /// Releases the GL context from the caller thread
-    void DoneCurrent() override;
-
     /// Whether the window is still open, and a close request hasn't yet been sent
     bool IsOpen() const;
 
     /// Creates a new context that is shared with the current context
-    std::unique_ptr<GraphicsContext> CreateSharedContext() const override;
+    std::unique_ptr<Frontend::GraphicsContext> CreateSharedContext() const override;
 
 private:
     /// Called by PollEvents when a key is pressed or released.

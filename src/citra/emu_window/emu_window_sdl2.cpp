@@ -23,25 +23,39 @@
 #include "video_core/renderer_base.h"
 #include "video_core/video_core.h"
 
-SharedContext_SDL2::SharedContext_SDL2() {
-    window = SDL_CreateWindow(NULL, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0,
-                              SDL_WINDOW_HIDDEN | SDL_WINDOW_OPENGL);
-    context = SDL_GL_CreateContext(window);
-}
+class SharedContext_SDL2 : public Frontend::GraphicsContext {
+public:
+    using SDL_GLContext = void*;
 
-SharedContext_SDL2::~SharedContext_SDL2() {
-    DoneCurrent();
-    SDL_GL_DeleteContext(context);
-    SDL_DestroyWindow(window);
-}
+    explicit SharedContext_SDL2(SDL_Window* window_)
+        : window(window_), context{SDL_GL_CreateContext(window_)} {}
 
-void SharedContext_SDL2::MakeCurrent() {
-    SDL_GL_MakeCurrent(window, context);
-}
+    ~SharedContext_SDL2() override {
+        DoneCurrent();
+        SDL_GL_DeleteContext(context);
+    }
 
-void SharedContext_SDL2::DoneCurrent() {
-    SDL_GL_MakeCurrent(window, nullptr);
-}
+    void MakeCurrent() override {
+        if (is_current) {
+            return;
+        }
+        SDL_GL_MakeCurrent(window, context);
+        is_current = true;
+    }
+
+    void DoneCurrent() override {
+        if (!is_current) {
+            return;
+        }
+        SDL_GL_MakeCurrent(window, nullptr);
+        is_current = false;
+    }
+
+private:
+    bool is_current = false;
+    SDL_GLContext context;
+    SDL_Window* window;
+};
 
 void EmuWindow_SDL2::OnMouseMotion(s32 x, s32 y) {
     TouchMoved((unsigned)std::max(x, 0), (unsigned)std::max(y, 0));
@@ -77,8 +91,8 @@ std::pair<unsigned, unsigned> EmuWindow_SDL2::TouchToPixelPos(float touch_x, flo
 
 void EmuWindow_SDL2::OnFingerDown(float x, float y) {
     // TODO(NeatNit): keep track of multitouch using the fingerID and a dictionary of some kind
-    // This isn't critical because the best we can do when we have that is to average them, like the
-    // 3DS does
+    // This isn't critical because the best we can do when we have that is to average them, like
+    // the 3DS does
 
     const auto [px, py] = TouchToPixelPos(x, y);
     TouchPressed(px, py);
@@ -219,7 +233,7 @@ EmuWindow_SDL2::~EmuWindow_SDL2() {
 }
 
 std::unique_ptr<Frontend::GraphicsContext> EmuWindow_SDL2::CreateSharedContext() const {
-    return std::make_unique<SharedContext_SDL2>();
+    return std::make_unique<SharedContext_SDL2>(render_window);
 }
 
 void EmuWindow_SDL2::Present() {
@@ -295,14 +309,6 @@ void EmuWindow_SDL2::PollEvents() {
         SDL_SetWindowTitle(render_window, title.c_str());
         last_time = current_time;
     }
-}
-
-void EmuWindow_SDL2::MakeCurrent() {
-    core_context->MakeCurrent();
-}
-
-void EmuWindow_SDL2::DoneCurrent() {
-    core_context->DoneCurrent();
 }
 
 void EmuWindow_SDL2::OnMinimalClientAreaChangeRequest(std::pair<u32, u32> minimal_size) {
